@@ -132,7 +132,7 @@ int32 angle     // 0.01deg
 
 uint8 enable    // 0 or 1
 
-int16 speed_limit   // deg/s
+uint16 speed_limit   // deg/s
 int32 angle         // 0.01deg
 ```
 
@@ -151,7 +151,7 @@ uint32 angle    // 0.01deg
 uint8 enable    // 0 or 1
 
 uint8 direction     // 0 for clockwise, 1 for counter-clockwise
-int16 speed_limit   // deg/s
+uint16 speed_limit   // deg/s
 uint32 angle        // 0.01deg
 ```
 

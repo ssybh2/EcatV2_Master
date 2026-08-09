@@ -1,4 +1,4 @@
 uint8 enable
 
-int16 speed_limit
+uint16 speed_limit
 int32 angle

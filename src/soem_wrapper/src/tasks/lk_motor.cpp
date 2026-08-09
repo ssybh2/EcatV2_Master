@@ -352,7 +352,7 @@ namespace aim::ecat::task {
         int offset = pdowrite_offset_;
 
         write_uint8(msg->enable, slave_device_->get_master_to_slave_buf().data(), &offset);
-        write_int16(msg->speed_limit, slave_device_->get_master_to_slave_buf().data(), &offset);
+        write_uint16(msg->speed_limit, slave_device_->get_master_to_slave_buf().data(), &offset);
         write_int32(msg->angle, slave_device_->get_master_to_slave_buf().data(), &offset);
     }
 
@@ -374,7 +374,7 @@ namespace aim::ecat::task {
 
         write_uint8(msg->enable, slave_device_->get_master_to_slave_buf().data(), &offset);
         write_uint8(msg->direction, slave_device_->get_master_to_slave_buf().data(), &offset);
-        write_int16(msg->speed_limit, slave_device_->get_master_to_slave_buf().data(), &offset);
+        write_uint16(msg->speed_limit, slave_device_->get_master_to_slave_buf().data(), &offset);
         write_uint32(msg->angle, slave_device_->get_master_to_slave_buf().data(), &offset);
     }
 
