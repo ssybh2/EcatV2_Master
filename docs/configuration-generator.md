@@ -62,6 +62,7 @@ They're tested by various test cases, and should be working fine.
     * [DJI Motor](task-info/dji-motor.md)
     * [DM Motor](task-info/dm-motor.md)
     * [LkTech Motor](task-info/lk-motor.md)
+    * [DD Motor](task-info/dd-motor.md)
     * [Onboard PWM](task-info/onboard-pwm.md)
 
 #### Untested tasks :(

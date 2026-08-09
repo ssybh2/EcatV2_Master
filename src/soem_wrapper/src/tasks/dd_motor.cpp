@@ -119,9 +119,8 @@ namespace aim::ecat::task {
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor1_ecd = read_uint16(
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
-            custom_msgs_readddmotor_shared_msg.motor1_rpm = static_cast<float>(read_int16(
-                                                                slave_device_->get_slave_to_master_buf().data(),
-                                                                &shared_offset_)) / 100.f;
+            custom_msgs_readddmotor_shared_msg.motor1_rpm = read_int16(
+                slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor1_current = read_int16(
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor1_mode = read_uint8(
@@ -142,9 +141,8 @@ namespace aim::ecat::task {
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor2_ecd = read_uint16(
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
-            custom_msgs_readddmotor_shared_msg.motor2_rpm = static_cast<float>(read_int16(
-                                                                slave_device_->get_slave_to_master_buf().data(),
-                                                                &shared_offset_)) / 100.f;
+            custom_msgs_readddmotor_shared_msg.motor2_rpm = read_int16(
+                slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor2_current = read_int16(
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor2_mode = read_uint8(
@@ -165,9 +163,8 @@ namespace aim::ecat::task {
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor3_ecd = read_uint16(
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
-            custom_msgs_readddmotor_shared_msg.motor3_rpm = static_cast<float>(read_int16(
-                                                                slave_device_->get_slave_to_master_buf().data(),
-                                                                &shared_offset_)) / 100.f;
+            custom_msgs_readddmotor_shared_msg.motor3_rpm = read_int16(
+                slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor3_current = read_int16(
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor3_mode = read_uint8(
@@ -188,9 +185,8 @@ namespace aim::ecat::task {
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor4_ecd = read_uint16(
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
-            custom_msgs_readddmotor_shared_msg.motor4_rpm = static_cast<float>(read_int16(
-                                                                slave_device_->get_slave_to_master_buf().data(),
-                                                                &shared_offset_)) / 100.f;
+            custom_msgs_readddmotor_shared_msg.motor4_rpm = read_int16(
+                slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor4_current = read_int16(
                 slave_device_->get_slave_to_master_buf().data(), &shared_offset_);
             custom_msgs_readddmotor_shared_msg.motor4_mode = read_uint8(
