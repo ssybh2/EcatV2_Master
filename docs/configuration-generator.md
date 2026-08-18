@@ -1,54 +1,46 @@
 # EtherCAT Configuration Generator
 
-这一页同时说明两种配置生成方式。**请先确认你的 EtherCAT Slave ProductCode。**
+这一页说明两种配置生成方式。**请先确认你的 EtherCAT Slave ProductCode。**
 
 ## 先选对生成器
 
-| Slave 类型 | ProductCode / eepid | Slave -> Master PDO | 推荐生成器 |
+| Slave 类型 | ProductCode / eepid | Slave → Master PDO | 推荐生成器 |
 | --- | ---: | ---: | --- |
 | H750 Universal Module | `0x03` | 80B | [AIMEtherCAT 原版 TaskEditor](https://aimethercat.github.io/TaskEditor/) |
 | H750 Universal Module (Large PDO V.) | `0x04` | 112B | [AIMEtherCAT 原版 TaskEditor](https://aimethercat.github.io/TaskEditor/) |
 | **H750 6-IMU Large PDO** | **`0x05`** | **160B** | **[ssybh2 6-IMU TaskEditor](https://ssybh2.github.io/EcatV2_Master/)** |
 
-> 如果你使用本项目 `feature/6imu-large-pdo` 的 6 个 HIPNUC IMU 版本，请不要用原版 TaskEditor 判断 PDO 是否溢出。原版网页目前只认识 0x03/0x04 的 80B/112B 容量，而我们的 0x05 固定使用 160B。
+> `feature/6imu-large-pdo` 的 6-IMU 版本不要使用原版 TaskEditor 判断 PDO 是否溢出。原版网页面向 0x03/0x04；我们的 0x05 固定使用 160B Slave→Master PDO。
 
 ---
 
 # ProductCode 0x05：6-IMU TaskEditor
 
-源码位置：
+在线网页：
 
-```text
-web/6imu-task-editor/
-```
+https://ssybh2.github.io/EcatV2_Master/
 
-详细教程：
+源码：
+
+https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo/web/6imu-task-editor
+
+详细说明：
 
 [6-IMU TaskEditor 使用说明](6imu-task-editor.md)
 
-在线网页（GitHub Pages 启用后）：
-
-```text
-https://ssybh2.github.io/EcatV2_Master/
-```
-
-## 这个网页为什么是专用版本？
-
-我们的 0x05 从站固定布局是：
+## 固定布局
 
 ```text
 Master -> Slave PDO: 80B
 
 Slave -> Master PDO: 160B
-  0..125    6 * 21B HIPNUC IMU
-  126..137  6 * sample_seq
-  138..149  6 * incomplete_count
+  0..125    6 × 21B HIPNUC IMU
+  126..137  6 × sample_seq
+  138..149  6 × incomplete_count
   150..159  CAN FIFO / read-error diagnostics
 ```
 
-所以网页固定创建 6 个 HIPNUC CAN IMU task，而不是允许任意增加其他 read task。
-
-## 默认 CAN 拓扑
+默认 CAN 拓扑：
 
 ```text
 CAN1
@@ -62,22 +54,20 @@ CAN2
   Slot3 -> 0x07 / 0x08 / 0x09
 ```
 
-对应 PDO read offset：
+PDO read offset：
 
 ```text
 0 / 21 / 42 / 63 / 84 / 105
 ```
 
-网页会自动生成：
+网页自动生成：
 
 ```text
 task_count = 6
 sdo_len = 85
 ```
 
-并检查同一条 CAN 总线上的 CAN ID 是否冲突。
-
-## ProductCode 0x05 为什么没有写进 config.yaml？
+## ProductCode 0x05 为什么不写进 config.yaml？
 
 `config.yaml` 负责 Master task 配置，不负责 EtherCAT 设备身份。
 
@@ -86,103 +76,117 @@ ProductCode `0x05` 来自：
 ```text
 AX58100 EEPROM
 +
-EcatV2_Master 中的 module registration
+EcatV2_Master module registration
 ```
 
-因此网页不会额外生成 `product_code: 0x05` 这样的 YAML 字段。这是正常设计。
-
-## 生成步骤
-
-1. 打开 6-IMU TaskEditor。
-2. 在 `Module Settings` 输入真实 Slave SN。
-3. 检查 CAN1/CAN2 六个 IMU 的 CAN ID、ROS2 topic 和 frame name。
-4. 切到 `Config Generator`。
-5. 确认状态为 `Ready to download`。
-6. 点击 `Download config.yaml`。
-7. 把文件放到 Master 的 `src/soem_wrapper/config/` 中。
-8. `colcon build` 后重新启动 Master。
-
-也可以不用网页，直接使用：
-
-```bash
-./tools/prepare_6imu_bringup.sh <SN> <EtherCAT网卡> <RT_CPU> <NON_RT_CPUS>
-```
+所以网页不会生成 `product_code: 0x05` 字段。
 
 ---
 
-# ProductCode 0x03 / 0x04：原版 AIMEtherCAT TaskEditor
+# 按原仓库方式使用生成的 config.yaml
 
-如果你使用普通 H750 Universal Module 或原来的 112B Large PDO，可以继续使用：
+原版 `configuration-generator.md` 的关键原则是：
 
-[AIMEtherCAT TaskEditor](https://aimethercat.github.io/TaskEditor/)
+> 下载 `config.yaml` 后，把它放进 **bringup package 的 config 文件夹**，重新 `colcon build`，再启动 bringup package。
 
-原版网页的主要流程是：
-
-## Add Module
-
-选择对应的 H750 module，然后填写 `Module SN`。SN 一般来自第一次 `slaveinfo` / first-run test。
-
-## Basic configuration
-
-### Serial Number
-
-填写从站真实 SN。通常是 7 位数字。
-
-### Module Latency Topic
-
-默认会根据 SN 自动生成，也可以手动修改。
-
-## Add Task
-
-展开 module 后添加需要的 task，例如：
-
-- DJI RC
-- SBUS RC
-- HIPNUC IMU (CAN)
-- DSHOT600
-- DJI Motor
-- DM Motor
-- LkTech Motor
-- DD Motor
-- Onboard PWM
-- 其他实验性 task
-
-不同 task 会产生不同 SDO 参数、PDO read/write 长度和 ROS2 topic。
-
-原版 TaskEditor 会自动计算 PDO offset，并在 module 容量不足时提示 overflow。
-
-## Download Configuration File
-
-完成配置以后进入 `Config Generator` 页面，检查 module PDO 状态，然后下载：
+我们的 6-IMU 版本保持同样结构：
 
 ```text
-config.yaml
+<workspace>/
+└── src/
+    ├── EcatV2_Master/
+    └── soem_bringup/
+        ├── CMakeLists.txt
+        ├── package.xml
+        ├── config/
+        │   └── config.yaml
+        └── launch/
+            └── bringup.launch.py
 ```
 
-## Upload Your Configuration File
+## 网页生成步骤
 
-把生成的 YAML 放进 bringup package 的 `config` 文件夹，例如：
+1. 打开 [6-IMU TaskEditor](https://ssybh2.github.io/EcatV2_Master/)。
+2. 输入 `first-run test` 中得到的真实 Slave SN。
+3. 检查 6 个 IMU 的 CAN ID、ROS2 topic 和 frame name。
+4. 进入 `Config Generator`。
+5. 确认检查结果全部通过。
+6. 下载 `config.yaml`。
+7. 放到：
 
 ```text
-src/soem_wrapper/config/config.yaml
+<workspace>/src/soem_bringup/config/config.yaml
 ```
 
-如果修改了文件名，也要同步修改 `bringup.launch.py`。
-
-最后回到 workspace 根目录：
+8. 回到 workspace：
 
 ```bash
+source /opt/ros/humble/setup.bash
 colcon build
 source install/setup.bash
 ```
 
-然后启动 EtherCAT Master。
+9. 最终启动：
+
+```bash
+ros2 launch soem_bringup bringup.launch.py
+```
+
+> EtherCAT backend 需要 raw socket/root 权限时，进入 root shell 后要重新 source ROS 2 和 workspace。
+
+---
+
+# 自动创建 soem_bringup
+
+如果不想手工创建 `CMakeLists.txt/package.xml/config/launch`，运行：
+
+```bash
+cd <workspace>/src/EcatV2_Master
+
+./tools/prepare_6imu_bringup.sh \
+  <SN> \
+  <EtherCAT网卡> \
+  <RT_CPU> \
+  <NON_RT_CPUS>
+```
+
+它会自动生成与原版 `first-run-test.md` 相同职责的：
+
+```text
+<workspace>/src/soem_bringup/
+├── CMakeLists.txt
+├── package.xml
+├── config/config.yaml
+└── launch/bringup.launch.py
+```
+
+---
+
+# ProductCode 0x03 / 0x04：原版 TaskEditor
+
+普通 H750 Universal Module / 112B Large PDO 继续使用：
+
+https://aimethercat.github.io/TaskEditor/
+
+原版流程：
+
+```text
+Add Module
+→ 填真实 Slave SN
+→ Add Task
+→ 检查 PDO overflow
+→ Download config.yaml
+→ 放入 soem_bringup/config/
+→ colcon build
+→ ros2 launch soem_bringup bringup.launch.py
+```
 
 ---
 
 # 相关文档
 
+- [Environment Setup](environment-setup.md)
 - [First Run Test](first-run-test.md)
-- [6 个 IMU × 500 Hz 小白部署教程](6imu-deployment-beginner-cn.md)
+- [6 个 IMU × 500 Hz 完整小白部署教程](6imu-deployment-beginner-cn.md)
 - [6-IMU TaskEditor 使用说明](6imu-task-editor.md)
-- [6-IMU / 500 Hz 压力测试计划](6imu-500hz-test-plan.md)
+- [6-IMU / 500 Hz 压力测试计划（中英双语）](6imu-500hz-test-plan.md)

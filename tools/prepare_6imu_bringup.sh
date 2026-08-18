@@ -3,8 +3,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEMPLATE="$ROOT_DIR/src/soem_wrapper/config/config_6imu_template.yaml"
-CONFIG_OUT="$ROOT_DIR/src/soem_wrapper/config/dev-config.yaml"
-LAUNCH_OUT="$ROOT_DIR/src/soem_wrapper/launch/bringup.launch.py"
 BACKUP_DIR="$ROOT_DIR/.local_6imu_backups"
 
 usage() {
@@ -15,12 +13,20 @@ Usage:
 Example:
   tools/prepare_6imu_bringup.sh 2883658 enx000ec6c1d02b 1 0,2-15
 
-This generates the two local files used for a 6-IMU bringup:
-  src/soem_wrapper/config/dev-config.yaml
-  src/soem_wrapper/launch/bringup.launch.py
+This creates/updates the ROS 2 bringup package used by the original
+EcatV2_Master workflow:
 
-The generated files are intentionally ignored by Git so machine-specific
-settings do not get committed accidentally.
+  <workspace>/src/soem_bringup/
+  ├── CMakeLists.txt
+  ├── package.xml
+  ├── config/
+  │   └── config.yaml
+  └── launch/
+      └── bringup.launch.py
+
+The final launch command is:
+
+  ros2 launch soem_bringup bringup.launch.py
 EOF
 }
 
@@ -59,14 +65,62 @@ if [[ ! -f "$TEMPLATE" ]]; then
   exit 1
 fi
 
-mkdir -p "$BACKUP_DIR"
-STAMP="$(date +%Y%m%d_%H%M%S)"
+REPO_PARENT="$(dirname "$ROOT_DIR")"
+if [[ "$(basename "$REPO_PARENT")" == "src" ]]; then
+  WORKSPACE_ROOT="$(dirname "$REPO_PARENT")"
+  BRINGUP_DIR="$REPO_PARENT/soem_bringup"
+else
+  WORKSPACE_ROOT="$ROOT_DIR"
+  BRINGUP_DIR="$ROOT_DIR/src/soem_bringup"
+fi
 
+CONFIG_DIR="$BRINGUP_DIR/config"
+LAUNCH_DIR="$BRINGUP_DIR/launch"
+CONFIG_OUT="$CONFIG_DIR/config.yaml"
+LAUNCH_OUT="$LAUNCH_DIR/bringup.launch.py"
+
+mkdir -p "$CONFIG_DIR" "$LAUNCH_DIR" "$BACKUP_DIR"
+
+STAMP="$(date +%Y%m%d_%H%M%S)"
 for file in "$CONFIG_OUT" "$LAUNCH_OUT"; do
   if [[ -f "$file" ]]; then
     cp -a "$file" "$BACKUP_DIR/$(basename "$file").${STAMP}.bak"
   fi
 done
+
+cat > "$BRINGUP_DIR/CMakeLists.txt" <<'EOF'
+cmake_minimum_required(VERSION 3.8)
+project(soem_bringup)
+
+find_package(ament_cmake REQUIRED)
+
+install(DIRECTORY
+  launch
+  config
+  DESTINATION share/${PROJECT_NAME}/
+)
+
+ament_package()
+EOF
+
+cat > "$BRINGUP_DIR/package.xml" <<'EOF'
+<?xml version="1.0"?>
+<package format="3">
+  <name>soem_bringup</name>
+  <version>0.0.0</version>
+  <description>Bringup package for EcatV2_Master 6-IMU deployment.</description>
+
+  <maintainer email="ssybh2@nottingham.edu.cn">ssybh2</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>soem_wrapper</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
+EOF
 
 python3 - "$TEMPLATE" "$CONFIG_OUT" "$SERIAL" <<'PY'
 from pathlib import Path
@@ -98,9 +152,9 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
     config_file = os.path.join(
-        get_package_share_directory('soem_wrapper'),
+        get_package_share_directory('soem_bringup'),
         'config',
-        'dev-config.yaml'
+        'config.yaml'
     )
 
     return LaunchDescription([
@@ -135,31 +189,34 @@ checks = {
     f"'interface': '{iface}'": launch,
     f"'rt_cpu': {rt_cpu}": launch,
     f"'non_rt_cpus': '{non_rt}'": launch,
-    "'dev-config.yaml'": launch,
+    "get_package_share_directory('soem_bringup')": launch,
+    "'config.yaml'": launch,
 }
 
 missing = [needle for needle, haystack in checks.items() if needle not in haystack]
 if missing:
     raise SystemExit("ERROR: generated bringup verification failed: " + ", ".join(missing))
 
-print("6-IMU bringup generation verification PASSED")
+print("6-IMU soem_bringup generation verification PASSED")
 PY
 
 echo
 echo "============================================================"
-echo "6-IMU Master bringup prepared"
-echo "  slave SN    : $SERIAL"
-echo "  interface   : $IFACE"
-echo "  RT CPU      : $RT_CPU"
-echo "  non-RT CPUs : $NON_RT_CPUS"
-echo "  config      : $CONFIG_OUT"
-echo "  launch      : $LAUNCH_OUT"
+echo "6-IMU ROS 2 bringup package prepared"
+echo "  workspace    : $WORKSPACE_ROOT"
+echo "  bringup pkg  : $BRINGUP_DIR"
+echo "  slave SN     : $SERIAL"
+echo "  interface    : $IFACE"
+echo "  RT CPU       : $RT_CPU"
+echo "  non-RT CPUs  : $NON_RT_CPUS"
+echo "  config       : $CONFIG_OUT"
+echo "  launch       : $LAUNCH_OUT"
 echo "============================================================"
 echo
 echo "Next commands from the workspace root:"
 echo "  source /opt/ros/humble/setup.bash"
 echo "  colcon build"
 echo "  source install/setup.bash"
-echo "  ros2 launch soem_wrapper bringup.launch.py"
 echo
-echo "The EtherCAT backend normally needs root privileges/raw-socket access."
+echo "Run as root/raw-socket-capable user:"
+echo "  ros2 launch soem_bringup bringup.launch.py"

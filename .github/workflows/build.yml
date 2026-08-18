@@ -42,14 +42,15 @@ jobs:
             1 \
             0,2-3
 
-          python3 -m py_compile src/soem_wrapper/launch/bringup.launch.py
-          grep -q 'sn7654321' src/soem_wrapper/config/dev-config.yaml
-          grep -q 'sdo_len: !uint16_t 85' src/soem_wrapper/config/dev-config.yaml
-          grep -q 'task_count: !uint8_t 6' src/soem_wrapper/config/dev-config.yaml
-          grep -q 'pdoread_offset: !uint16_t 105' src/soem_wrapper/config/dev-config.yaml
-          grep -q "'interface': 'lo'" src/soem_wrapper/launch/bringup.launch.py
+          python3 -m py_compile src/soem_bringup/launch/bringup.launch.py
+          grep -q 'sn7654321' src/soem_bringup/config/config.yaml
+          grep -q 'sdo_len: !uint16_t 85' src/soem_bringup/config/config.yaml
+          grep -q 'task_count: !uint8_t 6' src/soem_bringup/config/config.yaml
+          grep -q 'pdoread_offset: !uint16_t 105' src/soem_bringup/config/config.yaml
+          grep -q "get_package_share_directory('soem_bringup')" src/soem_bringup/launch/bringup.launch.py
+          grep -q "'interface': 'lo'" src/soem_bringup/launch/bringup.launch.py
 
-          echo "6-IMU helper validation OK"
+          echo "6-IMU soem_bringup helper validation OK"
 
       - name: Build workspace
         shell: bash
@@ -59,12 +60,20 @@ jobs:
             --event-handlers console_direct+ \
             --cmake-args -DCMAKE_BUILD_TYPE=Release
 
-      - name: Verify six-IMU master package
+      - name: Verify six-IMU master and bringup packages
         shell: bash
         run: |
           source /opt/ros/humble/setup.bash
           source install/setup.bash
+
           test -d install/soem_wrapper
-          test -f install/soem_wrapper/share/soem_wrapper/config/dev-config.yaml
-          test -f install/soem_wrapper/share/soem_wrapper/launch/bringup.launch.py
+          test -d install/soem_bringup
+          test -f install/soem_bringup/share/soem_bringup/config/config.yaml
+          test -f install/soem_bringup/share/soem_bringup/launch/bringup.launch.py
+
+          ros2 pkg prefix soem_wrapper
+          ros2 pkg prefix soem_bringup
+
+          echo "Final launch command:"
+          echo "  ros2 launch soem_bringup bringup.launch.py"
           echo "6-IMU EtherCAT Master build OK"
