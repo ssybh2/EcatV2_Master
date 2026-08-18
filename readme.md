@@ -1,123 +1,142 @@
-# EcatV2 Master
+# EcatV2 Master — 6-IMU Extension
 
-**EcatV2 Master** is a EtherCAT master wrapper library based on **ROS 2** and **SOEM** (Simple Open EtherCAT Master,
-version 1.4.0, available [here](https://github.com/OpenEtherCATsociety/SOEM/tree/v1.4.0)).
+> 基于 [AIMEtherCAT/EcatV2_Master](https://github.com/AIMEtherCAT/EcatV2_Master) 的个人 6-IMU 扩展分支。  
+> 本分支用于 `STM32H750 + AX58100 + 2×CAN + 6×HIPNUC HI92 @ 500 Hz` 的开发与真机验证。
 
-This project aims to provide a stable, real-time EtherCAT communication backend for robotics applications. By using
-simplified YAML configurations and standardized ROS 2 interfaces, it provides an efficient way to test and verify
-control algorithms.
+## 🚀 Quick Links
 
-## Key Features
+| 入口 | 链接 |
+| --- | --- |
+| 🌐 6-IMU TaskEditor 在线版 | https://ssybh2.github.io/EcatV2_Master/ |
+| 💻 6-IMU TaskEditor 源码 | https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo/web/6imu-task-editor |
+| 📘 小白部署教程 | [docs/6imu-deployment-beginner-cn.md](docs/6imu-deployment-beginner-cn.md) |
+| 🧭 教程导航 | [docs/README.md](docs/README.md) |
+| 🧪 6-IMU 压力测试计划 | [docs/6imu-500hz-test-plan.md](docs/6imu-500hz-test-plan.md) |
+| ⚙️ 配置生成说明 | [docs/configuration-generator.md](docs/configuration-generator.md) |
 
-* **ROS 2 Integration**: Fully compatible with ROS 2 (Humble/Jazzy verified), enabling data interaction via standard
-  Topics.
-* **Configuration Driven**: Supports dynamic definition of slave topology, data length, and task mapping via YAML files,
-  eliminating the need for recompilation.
-* **Real-time Optimization**: Optimized for Real-time Kernels, supporting CPU core isolation and binding to ensure low
-  latency and low jitter for control loops.
-* **Modular Task System**: Built-in driver tasks for various common devices (e.g., DJI motors, IMUs, PWM controllers)
-  with easy support for extending custom tasks.
-* **Fault Tolerance & Recovery**: Supports automatic reconnection and recovery after unexpected disconnections or power
-  loss, with configurable `Keep Last` or `Reset to Default` protection modes to ensure safe system state restoration
-* **Auxiliary Tools**: Provides practical utilities for EEPROM flashing, slave information scanning, and more.
+## Branches
 
-## Quick Start
+这个 Fork 现在只需要记住两个有效角色：
 
-This project relies on several system environment configurations to guarantee real-time performance. Please read the
-tutorials in the following order:
+| Branch | 用途 |
+| --- | --- |
+| `main` | 保留原版/上游基线，方便随时对照 |
+| `feature/6imu-large-pdo` | 当前真正使用的 6-IMU 开发、部署与测试分支 |
 
-* Environment Preparation: [1. Environment Setup](docs/environment-setup.md)
-    * Covers BIOS settings, enabling Real-time kernel, and CPU core isolation.
-* First Run: [2. First Run Test](docs/first-run-test.md)
-    * Creating a Bringup package, flashing EEPROMs, and running your first test node.
-* Custom Configuration: [3. Customize configuration](docs/configuration-generator.md)
-    * Generate and customize the YAML configuration files based on your hardware topology.
-* 6-IMU / 500 Hz Bringup: [4. 6-IMU Bringup Guide](docs/6imu-bringup.md)
-    * End-to-end flashing, EEPROM, master configuration, launch, topic verification and staged load testing for the ProductCode 0x05 6-IMU stack.
+`feature/6imu-task-editor` 是网页开发时留下的 staging 分支。它已经与 `feature/6imu-large-pdo` 同步，**后续不再使用，可以安全删除**；网页源码已经完整保存在 `feature/6imu-large-pdo/web/6imu-task-editor/`。
 
-**FAQ: If you encounter issues, please check [0. FAQ](docs/faq.md) first.**
+## Target System
+
+```text
+CAN1 @ 1 Mbps                       CAN2 @ 1 Mbps
+├─ IMU1 Slot1 01/02/03             ├─ IMU4 Slot1 01/02/03
+├─ IMU2 Slot2 04/05/06             ├─ IMU5 Slot2 04/05/06
+└─ IMU3 Slot3 07/08/09             └─ IMU6 Slot3 07/08/09
+              \                     /
+               \                   /
+                STM32H750 + AX58100
+                         │
+                     EtherCAT
+                         │
+                    ROS 2 + SOEM
+                         │
+                 6 × sensor_msgs/Imu
+```
+
+### EtherCAT identity
+
+```text
+ProductCode = 0x00000005
+Master -> Slave = 80 B
+Slave  -> Master = 160 B
+```
+
+160 B Slave→Master PDO：
+
+```text
+0..125    6 × IMU payload (6 × 21 B)
+126..137  6 × sample_seq
+138..149  6 × incomplete_samples
+150..159  CAN FIFO lost/full/read-error diagnostics
+```
+
+## What This Branch Adds
+
+- 6 个 HIPNUC CAN IMU 固定布局，CAN1/CAN2 各 3 个。
+- 新的 ProductCode `0x05` / 160 B Large PDO。
+- 每个 IMU 的 `P1 -> P2 -> P3` 完整组包后才提交。
+- CAN RX FIFO 扩容、一次中断清空 FIFO、FIFO lost/full/read-error 诊断。
+- `sample_seq` 去重：Master 只在真正有新 IMU sample 时发布 ROS 话题。
+- 6-IMU TaskEditor：网页直接生成兼容本分支的 YAML。
+- `flash_6imu_eeprom.sh`：备份、校验、刷写、读回验证 ProductCode 0x05 EEPROM。
+- `prepare_6imu_bringup.sh`：根据 Slave SN / 网卡 / CPU 配置自动生成本机 `dev-config.yaml` 与 `bringup.launch.py`。
+
+## Recommended Deployment Order
+
+第一次部署不要直接插满 6 个 IMU。按下面顺序：
+
+```text
+1. 配好 Ubuntu / ROS 2 / 实时内核
+2. 烧 3 种 hipnucimu Slot 固件
+3. 烧 H750 6-IMU 固件
+4. 只连接 1 块 EtherCAT 从站
+5. slaveinfo 确认物理链路
+6. 备份并刷 ProductCode 0x05 EEPROM
+7. 先用占位 SN 启动一次，读取真实 SN
+8. 用 TaskEditor 或 prepare_6imu_bringup.sh 生成正式配置
+9. colcon build
+10. 进入 OP
+11. 1 → 2 → 3 → 3+1 → 3+2 → 3+3 逐级压力测试
+```
+
+完整命令、预期输出和错误判断请直接看：
+
+**[6 个 IMU × 500 Hz EtherCAT 部署教程（小白版）](docs/6imu-deployment-beginner-cn.md)**
 
 ## Directory Structure
 
-The core file structure is as follows to help you quickly locate code:
-
 ```text
 EcatV2_Master/
-├── docs/                   # Detailed documentation (Setup, First Run, Configuration Guides)
-├── eeproms/                # Pre-configured EEPROM firmware files for EtherCAT slaves
+├── docs/
+│   ├── README.md
+│   ├── environment-setup.md
+│   ├── first-run-test.md
+│   ├── configuration-generator.md
+│   ├── 6imu-deployment-beginner-cn.md
+│   ├── 6imu-task-editor.md
+│   └── 6imu-500hz-test-plan.md
+├── eeproms/
+│   └── 58100H750_UniversalModule_6IMU_LargePDOV.bin
 ├── src/
-│   ├── soem/               # SOEM native library source code (Submodule)
-│   ├── soem_wrapper/       # Core wrapper code (ROS 2 Node)
-│   └── custom_msgs/        # Custom ROS2 message definitions
-└── tools/                  # Utility tools provided by SOEM
+│   ├── custom_msgs/
+│   ├── soem/
+│   └── soem_wrapper/
+│       ├── config/config_6imu_template.yaml
+│       ├── launch/
+│       └── src/
+├── tools/
+│   ├── slaveinfo
+│   ├── eepromtool
+│   ├── flash_6imu_eeprom.sh
+│   └── prepare_6imu_bringup.sh
+└── web/
+    └── 6imu-task-editor/
+        ├── index.html
+        ├── app.js
+        ├── generator.js
+        ├── styles.css
+        └── test-generator.js
 ```
 
-## Tools
+## Related Firmware Repositories
 
-The `tools/` directory contains useful utilities provided by SOEM:
+- H750 + AX58100 slave: https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/tree/feature/6imu-large-pdo
+- HIPNUC IMU bridge: https://github.com/ssybh2/hipnucimu/tree/feature/6imu-500hz-stable
 
-* `eepromtool`: For flashing EtherCAT slave EEPROMs.
-* `slaveinfo`: For reading slave information. You can use this to check if the system detected your slave boards.
-* `simple_test`: For testing the connection between master and slaves.
-* `flash_6imu_eeprom.sh`: Safely backs up, validates, flashes and verifies the ProductCode 0x05 6-IMU EEPROM image.
-* `prepare_6imu_bringup.sh`: Generates the local 6-IMU ROS 2 config and launch files from the board SN and machine settings.
+## Upstream
 
-## Additional Info
+This work is based on the original AIMEtherCAT projects. The upstream repositories remain untouched; all 6-IMU changes live only in the `ssybh2` forks.
 
-* EtherCAT currently running in `Free-run` mode.
-
-* ROS2 Topic QOS is `Sensor Data QoS`
-    * History: Keep last,
-    * Depth: 5,
-    * Reliability: Best effort,
-    * Durability: Volatile,
-    * Deadline: Default,
-    * Lifespan: Default,
-    * Liveliness: System default,
-    * Liveliness lease duration: default,
-    * avoid ros namespace conventions: false
-
-## Simple Performance Test
-
-This test measures the round-trip time (RTT) between a master node and a single slave node. The master sends a 1-byte
-sequence number to the slave and records the send timestamp. Upon receiving the packet, the slave will send it back to
-the master. The master then calculates the RTT by subtracting the original send timestamp from the time it receives the
-reply and publishes this latency as a Float32 message on corresponding latency topic.
-
-### Test Environment
-
-* **Operating System:** Ubuntu 24.04
-* **Kernel:** 6.8.1-1031-realtime
-* **ROS 2:** Jazzy 0.11.0-1noble.20250814.111056 amd64
-* **CPU:** 12th Gen Intel® Core™ i7-12650H
-* **Boot Parameters:**
-  ``BOOT_IMAGE=/boot/vmlinuz-6.8.1-1031-realtime root=UUID=fd122407-8308-41d2-abcb-ae2fe12fc3ae ro quiet splash vt.handoff=7 nohz=on nohz_full=0,1 rcu_nocbs=0,1 isolcpus=0,1 irqaffinity=2-15``
-* **Network Interface Card (NIC):**
-    * PCI Address: 03:00.0
-    * Model: Realtek RTL8111/8168/8211/8411 PCI Express Gigabit Ethernet Controller (rev 15)
-    * Driver: r8169
-    * Firmware Version: rtl8168h-2_0.0.2 02/26/2015
-* **Active Tasks:**
-    * 1x DBUS
-    * 1x DM motor in MIT mode on CAN1 (1 motor)
-    * 1x LK motor in broadcast mode on CAN2 (4 motors)
-* **Additional Applications Running:**
-    * Foxglove Bridge
-    * CLion IDE
-    * Standalone Python node recording `/latency` topic data
-
-### Test Result
-
-| Mean (ms) | Max (ms) | Min (ms) | 50th percentile (ms) | 90th percentile (ms) | 95th percentile (ms) | 99th percentile (ms) |
-|:---------:|:--------:|:--------:|:--------------------:|:--------------------:|:--------------------:|:--------------------:|
-|   0.241   |  0.414   |  0.169   |        0.222         |        0.314         |        0.321         |        0.333         |
-
-![rtt-graph.png](docs/img/rtt-graph.png)
-
-## Sponsors & Partners
-
-We would like to thank [**RT-Labs**](https://rt-labs.com) for supporting our project.  
-
-## Maintainer
-
-* Hang (scyhx9@nottingham.ac.uk)
+- Upstream Master: https://github.com/AIMEtherCAT/EcatV2_Master
+- Upstream H750 slave: https://github.com/AIMEtherCAT/EcatV2_AX58100_H750_Universal
+- Upstream HIPNUC bridge: https://github.com/AIMEtherCAT/hipnucimu
