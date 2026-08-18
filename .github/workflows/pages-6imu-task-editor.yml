@@ -1,0 +1,62 @@
+name: Deploy 6-IMU TaskEditor
+
+on:
+  push:
+    branches:
+      - "feature/6imu-large-pdo"
+    paths:
+      - "web/6imu-task-editor/**"
+      - ".github/workflows/pages-6imu-task-editor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-6imu-task-editor"
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check web/6imu-task-editor/generator.js
+          node --check web/6imu-task-editor/app.js
+          node --check web/6imu-task-editor/test-generator.js
+
+      - name: Test six-IMU YAML generator
+        run: node web/6imu-task-editor/test-generator.js
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static editor
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: web/6imu-task-editor
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -11,9 +11,31 @@
    学习 EtherCAT 从站发现、SN、EEPROM、YAML 和第一次启动。
 
 3. [Configuration Generator](configuration-generator.md)  
-   了解普通设备如何生成和修改配置。
+   了解普通设备和 6-IMU ProductCode 0x05 应该分别使用哪个配置生成器。
 
-## 6 个 IMU × 500 Hz 专用教程
+## 6 个 IMU × 500 Hz 专用工具
+
+### 6-IMU TaskEditor 网页
+
+在线地址（GitHub Pages 启用后）：
+
+```text
+https://ssybh2.github.io/EcatV2_Master/
+```
+
+- [6-IMU TaskEditor 使用说明](6imu-task-editor.md)
+- 网页源码：`web/6imu-task-editor/`
+
+这个网页专门生成：
+
+```text
+ProductCode 0x05
+6 × HIPNUC IMU
+sdo_len = 85
+task_count = 6
+PDO offset = 0 / 21 / 42 / 63 / 84 / 105
+160B Slave -> Master PDO
+```
 
 ### 推荐：第一次部署直接看这里
 
@@ -27,7 +49,7 @@ H750 固件怎么烧
 CAN1/CAN2 六个 IMU 怎么分配
 AX58100 ProductCode 0x05 EEPROM 怎么安全刷
 怎么找 EtherCAT 网卡和 Slave SN
-怎么一键生成 6-IMU Master 配置
+怎么用网页或脚本生成 6-IMU Master 配置
 怎么 colcon build / launch
 怎么检查 6 个 ROS IMU topic
 怎么从 1 → 2 → 3 → 6 个 IMU 做压力测试

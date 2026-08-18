@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="6-IMU EtherCAT TaskEditor for ProductCode 0x05 H750 + AX58100 slave" />
+  <title>6-IMU EtherCAT TaskEditor</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">ssybh2 / EcatV2_Master</div>
+        <h1>6-IMU EtherCAT TaskEditor</h1>
+        <p class="subtitle">为 STM32H750 + AX58100 · ProductCode 0x05 · 6×HIPNUC IMU @ 500 Hz 定制</p>
+      </div>
+      <div class="header-actions">
+        <a class="ghost-button" href="https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo" target="_blank" rel="noreferrer">查看仓库</a>
+        <button id="resetAllButton" class="danger-ghost" type="button">恢复默认</button>
+      </div>
+    </header>
+
+    <section class="info-banner">
+      <div class="info-icon">i</div>
+      <div>
+        <strong>这里生成的是 Master 的 config.yaml，不是 AX58100 EEPROM。</strong>
+        <span>ProductCode <code>0x05</code> 来自 EEPROM；本网页负责 6 个 IMU task、CAN ID、PDO offset、ROS2 topic 和 frame_name。</span>
+      </div>
+    </section>
+
+    <nav class="tabs" aria-label="TaskEditor tabs">
+      <button class="tab active" type="button" data-tab="settings">Module Settings</button>
+      <button class="tab" type="button" data-tab="generator">Config Generator</button>
+    </nav>
+
+    <main>
+      <section id="settingsPanel" class="tab-panel active">
+        <div class="section-heading">
+          <div>
+            <h2>EtherCAT Modules</h2>
+            <p>每个模块固定为一块 ProductCode 0x05 H750 从站，并固定保留 6 个 IMU task。</p>
+          </div>
+          <button id="addModuleButton" class="primary-button" type="button">+ Add 6-IMU Module</button>
+        </div>
+        <div id="moduleList" class="module-list"></div>
+      </section>
+
+      <section id="generatorPanel" class="tab-panel">
+        <div class="generator-grid">
+          <div class="generator-left">
+            <div class="panel-card">
+              <div class="panel-title-row">
+                <div>
+                  <h2>Configuration Check</h2>
+                  <p>下载前先确保没有红色错误。</p>
+                </div>
+                <span id="globalStatusBadge" class="status-badge">Checking</span>
+              </div>
+              <div id="validationSummary"></div>
+            </div>
+
+            <div class="panel-card">
+              <h2>PDO / SDO Overview</h2>
+              <div id="pdoOverview"></div>
+            </div>
+
+            <div class="panel-card diagnostic-card">
+              <h2>160B Slave→Master Layout</h2>
+              <div class="memory-map">
+                <div class="memory-block imu" style="--size:21">IMU1<br><small>0–20</small></div>
+                <div class="memory-block imu" style="--size:21">IMU2<br><small>21–41</small></div>
+                <div class="memory-block imu" style="--size:21">IMU3<br><small>42–62</small></div>
+                <div class="memory-block imu" style="--size:21">IMU4<br><small>63–83</small></div>
+                <div class="memory-block imu" style="--size:21">IMU5<br><small>84–104</small></div>
+                <div class="memory-block imu" style="--size:21">IMU6<br><small>105–125</small></div>
+                <div class="memory-block diag" style="--size:34">Diagnostics 34B<br><small>126–159</small></div>
+              </div>
+              <p class="muted-note">诊断区包含 6×sample_seq、6×incomplete_count、CAN1/2 FIFO lost/full 和 read error。</p>
+            </div>
+          </div>
+
+          <div class="panel-card yaml-card">
+            <div class="panel-title-row yaml-toolbar">
+              <div>
+                <h2>config.yaml</h2>
+                <p>实时生成，可复制或直接下载。</p>
+              </div>
+              <div class="button-row">
+                <button id="copyYamlButton" class="ghost-button" type="button">Copy</button>
+                <button id="downloadYamlButton" class="primary-button" type="button">Download config.yaml</button>
+              </div>
+            </div>
+            <pre id="yamlPreview" class="yaml-preview" aria-label="Generated YAML"></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>6-IMU TaskEditor v<span id="versionText">—</span></span>
+      <span>Inspired by AIMEtherCAT/TaskEditor · custom implementation for ProductCode 0x05</span>
+    </footer>
+  </div>
+
+  <template id="moduleTemplate">
+    <article class="module-card">
+      <div class="module-header">
+        <div>
+          <div class="module-title-line">
+            <button class="collapse-button" type="button" aria-label="collapse">⌄</button>
+            <h3 class="module-title">H750 Universal Module — 6-IMU Large PDO</h3>
+            <span class="product-badge">ProductCode 0x05</span>
+            <span class="module-status status-badge">Checking</span>
+          </div>
+          <p class="module-subtitle">Master→Slave 80B · Slave→Master 160B · 6×21B IMU + 34B diagnostics</p>
+        </div>
+        <div class="button-row">
+          <button class="reset-module ghost-button" type="button">Reset Profile</button>
+          <button class="duplicate-module ghost-button" type="button">Duplicate</button>
+          <button class="delete-module danger-ghost" type="button">Delete</button>
+        </div>
+      </div>
+
+      <div class="module-body">
+        <div class="basic-grid">
+          <label class="field">
+            <span>Module SN</span>
+            <input class="module-sn" inputmode="numeric" placeholder="1234567" />
+            <small>可输入 1234567 或 sn1234567；生成时统一输出 sn1234567。</small>
+          </label>
+          <label class="field wide">
+            <span>Module Latency Topic</span>
+            <input class="module-latency" placeholder="/ecat/sn1234567/latency" />
+            <small>SN 改变时，默认 latency topic 会自动跟随。</small>
+          </label>
+          <div class="readonly-field">
+            <span>SDO Length</span>
+            <strong>85 B</strong>
+            <small>1 + 6 × (task type + CAN port + 3×uint32 CAN ID)</small>
+          </div>
+          <div class="readonly-field">
+            <span>Task Count</span>
+            <strong>6</strong>
+            <small>0x05 固定 6 个 HIPNUC IMU task。</small>
+          </div>
+        </div>
+
+        <div class="bus-grid">
+          <section class="bus-card" data-bus="1">
+            <div class="bus-heading">
+              <div>
+                <span class="bus-kicker">FDCAN1 · 1 Mbps</span>
+                <h4>CAN1 — IMU1 / IMU2 / IMU3</h4>
+              </div>
+              <span class="bus-load">3 × 500 Hz</span>
+            </div>
+            <div class="imu-list"></div>
+          </section>
+
+          <section class="bus-card" data-bus="2">
+            <div class="bus-heading">
+              <div>
+                <span class="bus-kicker">FDCAN2 · 1 Mbps</span>
+                <h4>CAN2 — IMU4 / IMU5 / IMU6</h4>
+              </div>
+              <span class="bus-load">3 × 500 Hz</span>
+            </div>
+            <div class="imu-list"></div>
+          </section>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <template id="imuTemplate">
+    <div class="imu-card">
+      <div class="imu-heading">
+        <div>
+          <strong class="imu-name">CAN1 Slot1</strong>
+          <span class="firmware-pill">slot1 firmware</span>
+        </div>
+        <span class="offset-pill">PDO offset 0</span>
+      </div>
+      <div class="id-grid">
+        <label class="field compact"><span>Packet1 ID</span><input class="can-id id1" /></label>
+        <label class="field compact"><span>Packet2 ID</span><input class="can-id id2" /></label>
+        <label class="field compact"><span>Packet3 ID</span><input class="can-id id3" /></label>
+      </div>
+      <label class="field compact"><span>ROS2 Publish Topic</span><input class="imu-topic" /></label>
+      <label class="field compact"><span>frame_name</span><input class="imu-frame" /></label>
+      <div class="imu-error"></div>
+    </div>
+  </template>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="generator.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
