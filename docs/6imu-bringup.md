@@ -1,180 +1,216 @@
 # 6-IMU / 500 Hz Bringup Guide
 
-This guide is for the `feature/6imu-large-pdo` stack:
+> 这是简版检查表。第一次部署请优先看：
+>
+> [6 个 IMU × 500 Hz EtherCAT 完整部署教程（小白版）](6imu-deployment-beginner-cn.md)
 
-- 6 Hipnuc IMUs at 500 Hz
-- STM32H750 + AX58100 EtherCAT slave
-- ProductCode / EEPROM ID `0x00000005`
-- Master -> Slave PDO: 80 bytes
-- Slave -> Master PDO: 160 bytes
-- ROS 2 Humble + SOEM master
-
-The intended physical IMU layout is:
+## Target
 
 ```text
-CAN1
-  Slot1: CAN IDs 0x01 / 0x02 / 0x03
-  Slot2: CAN IDs 0x04 / 0x05 / 0x06
-  Slot3: CAN IDs 0x07 / 0x08 / 0x09
-
-CAN2
-  Slot1: CAN IDs 0x01 / 0x02 / 0x03
-  Slot2: CAN IDs 0x04 / 0x05 / 0x06
-  Slot3: CAN IDs 0x07 / 0x08 / 0x09
+ProductCode = 0x00000005
+Master -> Slave = 80B
+Slave  -> Master = 160B
+CAN1 = 3 × HIPNUC @ 500 Hz
+CAN2 = 3 × HIPNUC @ 500 Hz
 ```
 
-Each IMU occupies 21 bytes in the slave-to-master PDO. The six read offsets are:
+最终 ROS 2 启动结构继续遵循原版 `first-run-test.md`：
 
 ```text
-0, 21, 42, 63, 84, 105
+<workspace>/src/
+├── EcatV2_Master/
+└── soem_bringup/
+    ├── CMakeLists.txt
+    ├── package.xml
+    ├── config/config.yaml
+    └── launch/bringup.launch.py
 ```
 
-## 1. Keep the three software pieces matched
+最终启动命令：
 
-Use the matching 6-IMU feature versions for:
+```bash
+ros2 launch soem_bringup bringup.launch.py
+```
 
-1. Hipnuc IMU firmware
-2. `EcatV2_AX58100_H750_Universal`
-3. `EcatV2_Master`
+---
 
-Do not mix the ProductCode `0x05` master with an older 80-byte-only slave EEPROM image.
+## 1. 使用匹配的软件分支
 
-## 2. Flash the IMU firmware
+```text
+Master:
+ssybh2/EcatV2_Master
+feature/6imu-large-pdo
 
-Program the three IMU slot variants so their CAN IDs do not overlap on the same CAN bus.
+H750 Slave:
+ssybh2/EcatV2_AX58100_H750_Universal
+feature/6imu-large-pdo
 
-Before installing all six IMUs, test them in stages according to `docs/6imu-500hz-test-plan.md`.
+G431 HIPNUC bridge:
+ssybh2/hipnucimu
+feature/6imu-500hz-stable
+```
 
-## 3. Flash the H750 application firmware
+---
 
-Use the firmware produced by the H750 GitHub Actions workflow named:
+## 2. 烧 3 种 IMU 固件
+
+```text
+slot1 -> 01/02/03
+slot2 -> 04/05/06
+slot3 -> 07/08/09
+```
+
+CAN1 与 CAN2 各使用一套 Slot1/2/3。
+
+---
+
+## 3. 烧 H750 6-IMU 固件
+
+从 H750 仓库 Actions 下载：
 
 ```text
 six-imu-slave-firmware
 ```
 
-The artifact contains:
+烧入 STM32H750。
+
+---
+
+## 4. 刷 AX58100 ProductCode 0x05 EEPROM
+
+```bash
+cd <workspace>/src/EcatV2_Master
+chmod +x tools/flash_6imu_eeprom.sh tools/eepromtool
+
+./tools/flash_6imu_eeprom.sh <EtherCAT网卡> 1
+```
+
+完成后彻底断电重启 slave。
+
+确认：
+
+```bash
+sudo ./tools/eepromtool <EtherCAT网卡> 1 -i
+```
+
+目标：
 
 ```text
-EcatV2_AX58100_H750_Universal.elf
-EcatV2_AX58100_H750_Universal.hex
-EcatV2_AX58100_H750_Universal.bin
+ProductCode = 0x00000005
 ```
 
-Use the normal STM32 flashing method for the board. This is the H750 MCU application firmware; it is not the AX58100 EEPROM image.
+---
 
-## 4. Back up and flash the AX58100 EEPROM
+## 5. 创建 soem_bringup
 
-The target EEPROM image is:
+第一次不知道真实 SN 时，可以先用假 SN：
+
+```bash
+cd <workspace>/src/EcatV2_Master
+
+./tools/prepare_6imu_bringup.sh \
+  1234567 \
+  <EtherCAT网卡> \
+  <RT_CPU> \
+  <NON_RT_CPUS>
+```
+
+脚本自动创建：
 
 ```text
-eeproms/58100H750_UniversalModule_6IMU_LargePDOV.bin
+<workspace>/src/soem_bringup/
+├── CMakeLists.txt
+├── package.xml
+├── config/config.yaml
+└── launch/bringup.launch.py
 ```
 
-The safe helper script validates ProductCode `0x05`, backs up the current EEPROM, asks for an explicit confirmation, writes the new image, reads it back, and compares every byte.
+---
 
-Example:
+## 6. Build
 
 ```bash
-cd ~/foot_ws
-chmod +x tools/flash_6imu_eeprom.sh
-./tools/flash_6imu_eeprom.sh enx000ec6c1d02b 1
-```
-
-Replace the interface and slave number with the real values on the machine.
-
-After a successful EEPROM write, power-cycle the EtherCAT slave before doing final discovery/mapping tests.
-
-## 5. Check the slave identity before ROS 2 bringup
-
-First inspect the slave without starting the ROS 2 backend:
-
-```bash
-sudo ./tools/slaveinfo enx000ec6c1d02b
-```
-
-and/or:
-
-```bash
-sudo ./tools/eepromtool enx000ec6c1d02b 1 -i
-```
-
-The target identity is ProductCode `0x00000005`.
-
-Record the actual board serial number printed during discovery. The serial number is used as the key in the ROS 2 configuration file.
-
-## 6. Generate the 6-IMU ROS 2 configuration automatically
-
-Do not manually edit the six task blocks unless necessary. Use:
-
-```bash
-chmod +x tools/prepare_6imu_bringup.sh
-./tools/prepare_6imu_bringup.sh <slave-serial> <ethercat-interface> <rt-cpu> <non-rt-cpus>
-```
-
-Example:
-
-```bash
-./tools/prepare_6imu_bringup.sh 2883658 enx000ec6c1d02b 1 0,2-15
-```
-
-It generates two local machine-specific files:
-
-```text
-src/soem_wrapper/config/dev-config.yaml
-src/soem_wrapper/launch/bringup.launch.py
-```
-
-These files are ignored by Git.
-
-The generated configuration contains:
-
-```text
-sdo_len    = 85 bytes
-task_count = 6
-CAN1 slots = app_1 / app_2 / app_3
-CAN2 slots = app_4 / app_5 / app_6
-PDO offsets = 0 / 21 / 42 / 63 / 84 / 105
-```
-
-## 7. Build the master
-
-From the workspace root:
-
-```bash
+cd <workspace>
 source /opt/ros/humble/setup.bash
+
 colcon build
 source install/setup.bash
 ```
 
-The generated config and launch files must be built/installed before launching.
+---
 
-## 8. Start the ROS 2 EtherCAT backend
+## 7. First Run：读取真实 SN
 
-The EtherCAT backend needs permission to use the raw network interface. Use the same root/capability method already used for this project.
-
-Typical root workflow:
+在 root/raw-socket-capable 环境中：
 
 ```bash
-sudo su
 source /opt/ros/humble/setup.bash
+cd <workspace>
 source install/setup.bash
-ros2 launch soem_wrapper bringup.launch.py
+
+ros2 launch soem_bringup bringup.launch.py
 ```
 
-A healthy startup should progress through slave discovery, configuration, SAFE_OP and OP, and finally report that the slave is ready.
-
-For ProductCode `0x05`, the master registers the module as:
+从日志找到：
 
 ```text
-H750UniversalModule (6-IMU Large PDO V.)
-Master -> Slave: 80 bytes
-Slave  -> Master: 160 bytes
+Found slave id=1, sn=<真实SN>, eepid=5, ...
 ```
 
-## 9. Verify all six ROS 2 IMU topics
+---
 
-The generated topics are:
+## 8. 生成正式 config.yaml
+
+方法 A：网页
+
+https://ssybh2.github.io/EcatV2_Master/
+
+下载后放到：
+
+```text
+<workspace>/src/soem_bringup/config/config.yaml
+```
+
+方法 B：helper
+
+```bash
+cd <workspace>/src/EcatV2_Master
+
+./tools/prepare_6imu_bringup.sh \
+  <真实SN> \
+  <EtherCAT网卡> \
+  <RT_CPU> \
+  <NON_RT_CPUS>
+```
+
+重新：
+
+```bash
+cd <workspace>
+colcon build
+source install/setup.bash
+```
+
+---
+
+## 9. 正式启动
+
+```bash
+ros2 launch soem_bringup bringup.launch.py
+```
+
+健康启动应看到：
+
+```text
+SAFE_OP
+OP
+Initialization succeeded
+slave confirmed ready
+```
+
+---
+
+## 10. 检查六个 IMU
 
 ```text
 /imu/can1/slot1
@@ -185,63 +221,34 @@ The generated topics are:
 /imu/can2/slot3
 ```
 
-Check they exist:
-
-```bash
-ros2 topic list | grep '^/imu/'
-```
-
-Check each one is updating:
+例如：
 
 ```bash
 ros2 topic echo /imu/can1/slot1 --once
-```
-
-Then measure rate, one topic at a time:
-
-```bash
 ros2 topic hz /imu/can1/slot1
 ```
 
-Repeat for the other five topics.
-
-Do not treat one successful packet as a stability result. Use the staged durations in `docs/6imu-500hz-test-plan.md`.
-
-## 10. Staged hardware test order
-
-Use this order so a fault can be localized instead of hidden inside the full six-IMU system:
+目标频率接近：
 
 ```text
-CAN1: 1 IMU
-  -> CAN1: 2 IMUs
-  -> CAN1: 3 IMUs
-  -> CAN1: 3 + CAN2: 1
-  -> CAN1: 3 + CAN2: 2
-  -> CAN1: 3 + CAN2: 3
+500 Hz
 ```
 
-At every stage record:
+---
 
-- ROS 2 topic frequency and jitter
-- missing/stale IMU values
-- H750 FDCAN FIFO lost/full counters
-- incomplete sample counters
-- CAN RX read errors
-- IMU-side CAN TX deferred/fail counters
-- CAN error state / Bus-Off events
+## 11. 压力测试
 
-If the full software diagnostic counters remain clean but the physical CAN bus shows errors, then move the investigation toward termination, wiring, grounding, transceiver power and stub length.
-
-## Stop conditions
-
-Stop the test and fix the fault before adding more IMUs if any of the following begins increasing continuously:
+不要直接满载。
 
 ```text
-FDCAN FIFO lost/full
-incomplete sample count
-CAN RX error count
-CAN TX fail count
-Bus-Off count
+1
+→ 2
+→ 3 on CAN1
+→ 3+1
+→ 3+2
+→ 3+3
 ```
 
-The purpose of staged testing is to find the first topology/load level where the system changes from stable to unstable.
+完整中文 + English 测试方案：
+
+[6-IMU / 500 Hz 压力测试计划](6imu-500hz-test-plan.md)
