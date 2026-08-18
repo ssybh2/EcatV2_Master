@@ -6,6 +6,7 @@
 #include "soem_wrapper/wrapper.hpp"
 #include "soem_wrapper/utils/config_utils.hpp"
 #include "soem_wrapper/utils/io_utils.hpp"
+#include "soem_wrapper/utils/logger_utils.hpp"
 
 #include <unordered_map>
 
@@ -17,15 +18,90 @@ namespace aim::ecat::task {
     namespace {
         constexpr uint16_t SIX_IMU_PDO_SIZE = 160;
         constexpr uint16_t SIX_IMU_DATA_SIZE = 126;
+        constexpr uint16_t SIX_IMU_SEQUENCE_BASE = 126;
+        constexpr uint16_t SIX_IMU_INCOMPLETE_BASE = 138;
+        constexpr uint16_t CAN1_FIFO_LOST_OFFSET = 150;
+        constexpr uint16_t CAN2_FIFO_LOST_OFFSET = 152;
+        constexpr uint16_t CAN1_FIFO_FULL_OFFSET = 154;
+        constexpr uint16_t CAN2_FIFO_FULL_OFFSET = 156;
+        constexpr uint16_t CAN1_READ_ERROR_OFFSET = 158;
+        constexpr uint16_t CAN2_READ_ERROR_OFFSET = 159;
         constexpr uint16_t HIPNUC_SAMPLE_SIZE = 21;
         constexpr uint8_t HIPNUC_IMU_COUNT = 6;
 
         struct SampleSequenceState {
             bool initialized{false};
             uint16_t last_seq{0};
+            uint16_t last_incomplete{0};
+        };
+
+        struct CanDiagnosticState {
+            bool initialized{false};
+            uint16_t can1_fifo_lost{0};
+            uint16_t can2_fifo_lost{0};
+            uint16_t can1_fifo_full{0};
+            uint16_t can2_fifo_full{0};
+            uint8_t can1_read_error{0};
+            uint8_t can2_read_error{0};
         };
 
         std::unordered_map<const HIPNUC_IMU_CAN *, SampleSequenceState> sequence_states;
+        CanDiagnosticState can_diag_state{};
+
+        uint16_t read_diag_u16(const std::shared_ptr<SlaveDevice> &slave_device, const uint16_t offset) {
+            int read_offset = offset;
+            return read_uint16(slave_device->get_slave_to_master_buf().data(), &read_offset);
+        }
+
+        uint8_t read_diag_u8(const std::shared_ptr<SlaveDevice> &slave_device, const uint16_t offset) {
+            return slave_device->get_slave_to_master_buf().at(offset);
+        }
+
+        void inspect_can_diagnostics(const std::shared_ptr<SlaveDevice> &slave_device) {
+            if (slave_device == nullptr || slave_device->get_slave_to_master_buf().size() < SIX_IMU_PDO_SIZE) {
+                return;
+            }
+
+            const uint16_t can1_lost = read_diag_u16(slave_device, CAN1_FIFO_LOST_OFFSET);
+            const uint16_t can2_lost = read_diag_u16(slave_device, CAN2_FIFO_LOST_OFFSET);
+            const uint16_t can1_full = read_diag_u16(slave_device, CAN1_FIFO_FULL_OFFSET);
+            const uint16_t can2_full = read_diag_u16(slave_device, CAN2_FIFO_FULL_OFFSET);
+            const uint8_t can1_read_error = read_diag_u8(slave_device, CAN1_READ_ERROR_OFFSET);
+            const uint8_t can2_read_error = read_diag_u8(slave_device, CAN2_READ_ERROR_OFFSET);
+
+            if (!can_diag_state.initialized) {
+                can_diag_state.initialized = true;
+                can_diag_state.can1_fifo_lost = can1_lost;
+                can_diag_state.can2_fifo_lost = can2_lost;
+                can_diag_state.can1_fifo_full = can1_full;
+                can_diag_state.can2_fifo_full = can2_full;
+                can_diag_state.can1_read_error = can1_read_error;
+                can_diag_state.can2_read_error = can2_read_error;
+                return;
+            }
+
+            if (can1_lost != can_diag_state.can1_fifo_lost ||
+                can2_lost != can_diag_state.can2_fifo_lost ||
+                can1_full != can_diag_state.can1_fifo_full ||
+                can2_full != can_diag_state.can2_fifo_full ||
+                can1_read_error != can_diag_state.can1_read_error ||
+                can2_read_error != can_diag_state.can2_read_error) {
+                RCLCPP_WARN_THROTTLE(
+                    *logging::get_health_checker_logger(),
+                    *get_node()->get_clock(),
+                    1000,
+                    "6-IMU CAN RX diagnostics changed: CAN1 lost=%u full=%u read_err=%u; CAN2 lost=%u full=%u read_err=%u",
+                    can1_lost, can1_full, can1_read_error,
+                    can2_lost, can2_full, can2_read_error);
+            }
+
+            can_diag_state.can1_fifo_lost = can1_lost;
+            can_diag_state.can2_fifo_lost = can2_lost;
+            can_diag_state.can1_fifo_full = can1_full;
+            can_diag_state.can2_fifo_full = can2_full;
+            can_diag_state.can1_read_error = can1_read_error;
+            can_diag_state.can2_read_error = can2_read_error;
+        }
 
         bool has_new_6imu_sample(const HIPNUC_IMU_CAN *owner,
                                  const std::shared_ptr<SlaveDevice> &slave_device,
@@ -33,6 +109,10 @@ namespace aim::ecat::task {
             if (slave_device == nullptr || slave_device->get_slave_to_master_buf_len() < SIX_IMU_PDO_SIZE) {
                 /* Old 80/112-byte slave types do not contain sequence counters. */
                 return true;
+            }
+
+            if (slave_device->get_slave_to_master_buf().size() < SIX_IMU_PDO_SIZE) {
+                return false;
             }
 
             if ((pdoread_offset % HIPNUC_SAMPLE_SIZE) != 0U) {
@@ -44,28 +124,57 @@ namespace aim::ecat::task {
                 return true;
             }
 
-            const uint16_t sequence_offset = SIX_IMU_DATA_SIZE + imu_index * sizeof(uint16_t);
-            if (sequence_offset + sizeof(uint16_t) > slave_device->get_slave_to_master_buf().size()) {
-                return true;
-            }
+            const uint16_t sequence_offset = SIX_IMU_SEQUENCE_BASE + imu_index * sizeof(uint16_t);
+            const uint16_t incomplete_offset = SIX_IMU_INCOMPLETE_BASE + imu_index * sizeof(uint16_t);
 
-            int offset = sequence_offset;
-            const uint16_t seq = read_uint16(slave_device->get_slave_to_master_buf().data(), &offset);
+            const uint16_t seq = read_diag_u16(slave_device, sequence_offset);
+            const uint16_t incomplete = read_diag_u16(slave_device, incomplete_offset);
             auto &state = sequence_states[owner];
+
+            /* Read global CAN FIFO diagnostics once from the first IMU task. */
+            if (imu_index == 0U) {
+                inspect_can_diagnostics(slave_device);
+            }
 
             if (!state.initialized) {
                 /* Before the first complete P1/P2/P3 sample the slave reports seq=0.
                  * Do not publish an all-zero/stale startup message. */
                 if (seq == 0U) {
+                    state.last_incomplete = incomplete;
                     return false;
                 }
                 state.initialized = true;
                 state.last_seq = seq;
+                state.last_incomplete = incomplete;
                 return true;
+            }
+
+            if (incomplete != state.last_incomplete) {
+                const uint16_t incomplete_delta = static_cast<uint16_t>(incomplete - state.last_incomplete);
+                RCLCPP_WARN_THROTTLE(
+                    *logging::get_health_checker_logger(),
+                    *get_node()->get_clock(),
+                    1000,
+                    "6-IMU #%u incomplete P1/P2/P3 sample(s): +%u, total(low16)=%u",
+                    static_cast<unsigned>(imu_index + 1U),
+                    static_cast<unsigned>(incomplete_delta),
+                    static_cast<unsigned>(incomplete));
+                state.last_incomplete = incomplete;
             }
 
             if (seq == state.last_seq) {
                 return false;
+            }
+
+            const uint16_t seq_delta = static_cast<uint16_t>(seq - state.last_seq);
+            if (seq_delta > 1U) {
+                RCLCPP_WARN_THROTTLE(
+                    *logging::get_health_checker_logger(),
+                    *get_node()->get_clock(),
+                    1000,
+                    "6-IMU #%u sample sequence jumped by %u (master did not observe every committed sample)",
+                    static_cast<unsigned>(imu_index + 1U),
+                    static_cast<unsigned>(seq_delta));
             }
 
             state.last_seq = seq;
