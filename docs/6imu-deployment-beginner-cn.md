@@ -4,9 +4,9 @@
 >
 > 它不是另起炉灶，而是把原版 AIMEtherCAT 的三条教程路线：
 >
-> 1. `environment-setup.md`
-> 2. `first-run-test.md`
-> 3. `configuration-generator.md`
+> 1. [Environment Setup（原版）](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/environment-setup.md)
+> 2. [First Run Test（原版）](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/first-run-test.md)
+> 3. [Configuration Generator（原版）](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/configuration-generator.md)
 >
 > 与我们新增的 **6-IMU 固件、ProductCode 0x05、160B PDO、6-IMU TaskEditor 和压力测试** 合并成一条完整流程。
 >
@@ -74,7 +74,7 @@ Slave→Master 160B：
 
 # Part A：Environment Setup —— 先把 Master 电脑准备好
 
-这一部分对应原仓库的 `docs/environment-setup.md`。
+这一部分对应原仓库的 [Environment Setup 原版教程](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/environment-setup.md)。
 
 ## 1. BIOS 设置
 
@@ -269,7 +269,7 @@ non_rt_cpus = 1-7
 
 ## 5. 创建 workspace
 
-这里仿照原版 `environment-setup.md` 的结构。
+这里仿照原版 [Environment Setup](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/environment-setup.md) 的结构。
 
 例如建立：
 
@@ -623,7 +623,7 @@ EtherCAT NIC = enp3s0
 
 # Part F：刷 ProductCode 0x05 EEPROM
 
-这一部分对应原版 `environment-setup.md` 的 EEPROM 步骤，但我们用安全脚本替代直接 `eepromtool -w`。
+这一部分对应原版 [Environment Setup](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/environment-setup.md) 的 EEPROM 步骤，但我们用安全脚本替代直接 `eepromtool -w`。
 
 ## 16. 先确认能看到从站
 
@@ -727,7 +727,7 @@ Product Code: 0x00000005
 
 # Part G：First Run Test —— 按原仓库方式创建 soem_bringup
 
-这一部分对应原版 `docs/first-run-test.md`。
+这一部分对应原版 [First Run Test 教程](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/first-run-test.md)。
 
 原版做法是手工：
 
@@ -794,7 +794,7 @@ non_rt_cpus
     └── bringup.launch.py
 ```
 
-这就是原仓库 `first-run-test.md` 的 bringup package，只是我们替你自动生成。
+这就是原仓库 [First Run Test](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/first-run-test.md) 的 bringup package，只是我们替你自动生成。
 
 ---
 
@@ -946,7 +946,7 @@ Found slave id=1, sn=2883658, eepid=5, type=H750UniversalModule (6-IMU Large PDO
 
 # Part H：Generate Config File —— 生成最终 config.yaml
 
-这一部分对应原版 `configuration-generator.md`。
+这一部分对应原版 [Configuration Generator 教程](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/configuration-generator.md)。
 
 你有两种方法。
 
@@ -1027,7 +1027,7 @@ config.yaml
 src/soem_wrapper/config/
 ```
 
-这点与原仓库 `configuration-generator.md` 的思想完全一致：
+这点与原仓库 [Configuration Generator](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/configuration-generator.md) 的思想完全一致：
 
 ```text
 配置文件属于 bringup package。
@@ -1496,6 +1496,12 @@ https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo/web/6imu-tas
 ## Master 分支
 
 https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo
+
+## 原版 AIMEtherCAT 教程
+
+- [Environment Setup（原版）](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/environment-setup.md)
+- [First Run Test（原版）](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/first-run-test.md)
+- [Configuration Generator（原版）](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/configuration-generator.md)
 
 ## 压力测试
 
