@@ -106,21 +106,17 @@ namespace aim::ecat {
             device_type = ec_slave[index_].eep_id;
             master_status_ = sdo_size_write_ptr_ == 0 ? MASTER_READY : MASTER_SENDING_ARGUMENTS;
 
-            // only explicitly clear buf in first configuration try
+            // Allocate and zero PDO buffers on the first configuration attempt.
+            // Do NOT clear() after resize(): clear() sets vector::size() back to zero
+            // and the old code then accessed memory outside the vector's valid range.
             if (oldSn == 0) {
-                master_to_slave_buf_.clear();
-                master_to_slave_buf_.resize(
-                    get_node()->get_device_master_to_slave_buf_len(ec_slave[index_].eep_id));
                 master_to_slave_buf_len_ = get_node()->get_device_master_to_slave_buf_len(
                     ec_slave[index_].eep_id);
-                master_to_slave_buf_.clear();
+                master_to_slave_buf_.assign(master_to_slave_buf_len_, 0U);
 
-                slave_to_master_buf_.clear();
-                slave_to_master_buf_.resize(
-                    get_node()->get_device_slave_to_master_buf_len(ec_slave[index_].eep_id));
                 slave_to_master_buf_len_ = get_node()->get_device_slave_to_master_buf_len(
                     ec_slave[index_].eep_id);
-                slave_to_master_buf_.clear();
+                slave_to_master_buf_.assign(slave_to_master_buf_len_, 0U);
             }
 
             RCLCPP_INFO(*get_cfg_logger(),
@@ -183,7 +179,7 @@ namespace aim::ecat {
                 sn_,
                 app_idx,
                 "sdowrite_task_type");
-            // write basic args
+
             auto [sdo_buf, sdo_len] = get_configuration_data()->build_buf(
                 fmt::format("sn{}_app_{}_sdowrite_",
                             sn_,
@@ -192,11 +188,16 @@ namespace aim::ecat {
                     "task_type"
                 }
             );
-            memcpy(arg_buf_.data()
-                   + arg_buf_idx,
-                   sdo_buf,
-                   sdo_len);
-            arg_buf_idx++;
+
+            if (arg_buf_idx + sdo_len > static_cast<int>(arg_buf_.size())) {
+                RCLCPP_ERROR(*get_cfg_logger(),
+                             "Slave id=%d SDO argument buffer overflow while loading app %d",
+                             index_, app_idx);
+                return false;
+            }
+
+            memcpy(arg_buf_.data() + arg_buf_idx, sdo_buf, sdo_len);
+            arg_buf_idx += sdo_len;
 
             std::unique_ptr<task::TaskWrapper> task_wrapper{};
 
@@ -259,6 +260,7 @@ namespace aim::ecat {
                 }
                 default: {
                     RCLCPP_ERROR(*get_cfg_logger(), "Unknown task type = %d", task_type);
+                    return false;
                 }
             }
 
@@ -267,6 +269,14 @@ namespace aim::ecat {
                                    index_,
                                    fmt::format("sn{}_app_{}_", sn_, app_idx)
             );
+
+            if (arg_buf_idx > static_cast<int>(arg_buf_.size())) {
+                RCLCPP_ERROR(*get_cfg_logger(),
+                             "Slave id=%d SDO argument buffer overflow after initializing app %d",
+                             index_, app_idx);
+                return false;
+            }
+
             task_list_.push_back(std::move(task_wrapper));
         }
 
@@ -387,14 +397,7 @@ namespace aim::ecat {
     }
 
     void SlaveDevice::backup_master_to_slave_buf() {
-        master_to_slave_buf_backup_.clear();
-        master_to_slave_buf_backup_.resize(
-            master_to_slave_buf_len_);
-        memcpy(
-            master_to_slave_buf_backup_.data(),
-            master_to_slave_buf_.data(),
-            master_to_slave_buf_len_
-        );
+        master_to_slave_buf_backup_.assign(master_to_slave_buf_.begin(), master_to_slave_buf_.end());
     }
 
     void SlaveDevice::on_connection_lost() const {
