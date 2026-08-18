@@ -1,0 +1,103 @@
+# 6 x Hipnuc IMU @ 500 Hz configuration template
+#
+# Target slave type:
+#   ProductCode / eepid: 0x05
+#   Master -> Slave PDO: 80 bytes
+#   Slave  -> Master PDO: 160 bytes
+#
+# Replace sn1234567 with the actual H750 EtherCAT board serial number before use.
+#
+# CAN topology:
+#   CAN1: Slot1 IDs 0x01-0x03, Slot2 IDs 0x04-0x06, Slot3 IDs 0x07-0x09
+#   CAN2: Slot1 IDs 0x01-0x03, Slot2 IDs 0x04-0x06, Slot3 IDs 0x07-0x09
+#
+# Each IMU contributes 21 bytes to the slave-to-master PDO.
+# PDO read offsets are therefore 0, 21, 42, 63, 84, 105.
+#
+# SDO payload length calculation:
+#   1 byte task_count
+#   + 6 * (1 byte task_type + 1 byte can_inst + 3 * uint32 CAN IDs)
+#   = 1 + 6 * 14
+#   = 85 bytes
+
+#define UNKNOWN_APP_ID 999
+#define DJIRC_APP_ID 1
+#define LK_APP_ID 2
+#define HIPNUC_IMU_CAN_APP_ID 3
+#define DSHOT_APP_ID 4
+#define DJICAN_APP_ID 5
+#define VANILLA_PWM_APP_ID 6
+#define EXTERNAL_PWM_APP_ID 7
+#define MS5837_30BA_APP_ID 8
+#define ADC_APP_ID 9
+#define CAN_PMU_APP_ID 10
+
+#define CAN_PORT_1 1
+#define CAN_PORT_2 2
+
+slaves:
+  - sn1234567:
+      sdo_len: !uint16_t 85
+      task_count: !uint8_t 6
+      latency_pub_topic: !std::string '/ecat/sn1234567/latency'
+
+      tasks:
+        - app_1:
+            sdowrite_task_type: !uint8_t 3
+            sdowrite_can_inst: !uint8_t 1
+            sdowrite_packet1_id: !uint32_t 1
+            sdowrite_packet2_id: !uint32_t 2
+            sdowrite_packet3_id: !uint32_t 3
+            pdoread_offset: !uint16_t 0
+            pub_topic: !std::string '/imu/can1/slot1'
+            conf_frame_name: !std::string 'imu_can1_slot1'
+
+        - app_2:
+            sdowrite_task_type: !uint8_t 3
+            sdowrite_can_inst: !uint8_t 1
+            sdowrite_packet1_id: !uint32_t 4
+            sdowrite_packet2_id: !uint32_t 5
+            sdowrite_packet3_id: !uint32_t 6
+            pdoread_offset: !uint16_t 21
+            pub_topic: !std::string '/imu/can1/slot2'
+            conf_frame_name: !std::string 'imu_can1_slot2'
+
+        - app_3:
+            sdowrite_task_type: !uint8_t 3
+            sdowrite_can_inst: !uint8_t 1
+            sdowrite_packet1_id: !uint32_t 7
+            sdowrite_packet2_id: !uint32_t 8
+            sdowrite_packet3_id: !uint32_t 9
+            pdoread_offset: !uint16_t 42
+            pub_topic: !std::string '/imu/can1/slot3'
+            conf_frame_name: !std::string 'imu_can1_slot3'
+
+        - app_4:
+            sdowrite_task_type: !uint8_t 3
+            sdowrite_can_inst: !uint8_t 2
+            sdowrite_packet1_id: !uint32_t 1
+            sdowrite_packet2_id: !uint32_t 2
+            sdowrite_packet3_id: !uint32_t 3
+            pdoread_offset: !uint16_t 63
+            pub_topic: !std::string '/imu/can2/slot1'
+            conf_frame_name: !std::string 'imu_can2_slot1'
+
+        - app_5:
+            sdowrite_task_type: !uint8_t 3
+            sdowrite_can_inst: !uint8_t 2
+            sdowrite_packet1_id: !uint32_t 4
+            sdowrite_packet2_id: !uint32_t 5
+            sdowrite_packet3_id: !uint32_t 6
+            pdoread_offset: !uint16_t 84
+            pub_topic: !std::string '/imu/can2/slot2'
+            conf_frame_name: !std::string 'imu_can2_slot2'
+
+        - app_6:
+            sdowrite_task_type: !uint8_t 3
+            sdowrite_can_inst: !uint8_t 2
+            sdowrite_packet1_id: !uint32_t 7
+            sdowrite_packet2_id: !uint32_t 8
+            sdowrite_packet3_id: !uint32_t 9
+            pdoread_offset: !uint16_t 105
+            pub_topic: !std::string '/imu/can2/slot3'
+            conf_frame_name: !std::string 'imu_can2_slot3'
