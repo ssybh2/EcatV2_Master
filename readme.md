@@ -7,6 +7,23 @@ This project aims to provide a stable, real-time EtherCAT communication backend 
 simplified YAML configurations and standardized ROS 2 interfaces, it provides an efficient way to test and verify
 control algorithms.
 
+## 🚀 ssybh2 6-IMU Extension
+
+This fork contains a dedicated experimental branch for a **STM32H750 + AX58100 + 2×CAN + 6×HIPNUC HI92 @ 500 Hz** setup.
+
+> The original/upstream-compatible baseline remains on `main`.  
+> All 6-IMU development and deployment work is kept in `feature/6imu-large-pdo`.
+
+| Entry | Link |
+| --- | --- |
+| 🌐 Online 6-IMU TaskEditor | https://ssybh2.github.io/EcatV2_Master/ |
+| 💻 TaskEditor source | https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo/web/6imu-task-editor |
+| 🧩 6-IMU development branch | https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo |
+| 📘 Beginner deployment guide | https://github.com/ssybh2/EcatV2_Master/blob/feature/6imu-large-pdo/docs/6imu-deployment-beginner-cn.md |
+| 🧭 6-IMU documentation index | https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo/docs |
+
+For the 6-IMU system, start with the **Beginner deployment guide** above instead of following `main` directly.
+
 ## Key Features
 
 * **ROS 2 Integration**: Fully compatible with ROS 2 (Humble/Jazzy verified), enabling data interaction via standard
