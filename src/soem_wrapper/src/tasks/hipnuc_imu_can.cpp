@@ -46,7 +46,7 @@ namespace aim::ecat::task {
         };
 
         std::unordered_map<const HIPNUC_IMU_CAN *, SampleSequenceState> sequence_states;
-        CanDiagnosticState can_diag_state{};
+        std::unordered_map<const SlaveDevice *, CanDiagnosticState> can_diag_states;
 
         uint16_t read_diag_u16(const std::shared_ptr<SlaveDevice> &slave_device, const uint16_t offset) {
             int read_offset = offset;
@@ -61,6 +61,8 @@ namespace aim::ecat::task {
             if (slave_device == nullptr || slave_device->get_slave_to_master_buf().size() < SIX_IMU_PDO_SIZE) {
                 return;
             }
+
+            auto &can_diag_state = can_diag_states[slave_device.get()];
 
             const uint16_t can1_lost = read_diag_u16(slave_device, CAN1_FIFO_LOST_OFFSET);
             const uint16_t can2_lost = read_diag_u16(slave_device, CAN2_FIFO_LOST_OFFSET);
