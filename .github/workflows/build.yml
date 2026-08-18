@@ -30,6 +30,27 @@ jobs:
           rosdep update
           rosdep install --from-paths src --ignore-src --rosdistro humble -r -y
 
+      - name: Validate 6-IMU helper scripts
+        shell: bash
+        run: |
+          bash -n tools/flash_6imu_eeprom.sh
+          bash -n tools/prepare_6imu_bringup.sh
+
+          bash tools/prepare_6imu_bringup.sh \
+            7654321 \
+            lo \
+            1 \
+            0,2-3
+
+          python3 -m py_compile src/soem_wrapper/launch/bringup.launch.py
+          grep -q 'sn7654321' src/soem_wrapper/config/dev-config.yaml
+          grep -q 'sdo_len: !uint16_t 85' src/soem_wrapper/config/dev-config.yaml
+          grep -q 'task_count: !uint8_t 6' src/soem_wrapper/config/dev-config.yaml
+          grep -q 'pdoread_offset: !uint16_t 105' src/soem_wrapper/config/dev-config.yaml
+          grep -q "'interface': 'lo'" src/soem_wrapper/launch/bringup.launch.py
+
+          echo "6-IMU helper validation OK"
+
       - name: Build workspace
         shell: bash
         run: |
@@ -44,4 +65,6 @@ jobs:
           source /opt/ros/humble/setup.bash
           source install/setup.bash
           test -d install/soem_wrapper
+          test -f install/soem_wrapper/share/soem_wrapper/config/dev-config.yaml
+          test -f install/soem_wrapper/share/soem_wrapper/launch/bringup.launch.py
           echo "6-IMU EtherCAT Master build OK"
