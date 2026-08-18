@@ -32,6 +32,8 @@ tutorials in the following order:
     * Creating a Bringup package, flashing EEPROMs, and running your first test node.
 * Custom Configuration: [3. Customize configuration](docs/configuration-generator.md)
     * Generate and customize the YAML configuration files based on your hardware topology.
+* 6-IMU / 500 Hz Bringup: [4. 6-IMU Bringup Guide](docs/6imu-bringup.md)
+    * End-to-end flashing, EEPROM, master configuration, launch, topic verification and staged load testing for the ProductCode 0x05 6-IMU stack.
 
 **FAQ: If you encounter issues, please check [0. FAQ](docs/faq.md) first.**
 
@@ -57,6 +59,8 @@ The `tools/` directory contains useful utilities provided by SOEM:
 * `eepromtool`: For flashing EtherCAT slave EEPROMs.
 * `slaveinfo`: For reading slave information. You can use this to check if the system detected your slave boards.
 * `simple_test`: For testing the connection between master and slaves.
+* `flash_6imu_eeprom.sh`: Safely backs up, validates, flashes and verifies the ProductCode 0x05 6-IMU EEPROM image.
+* `prepare_6imu_bringup.sh`: Generates the local 6-IMU ROS 2 config and launch files from the board SN and machine settings.
 
 ## Additional Info
 
