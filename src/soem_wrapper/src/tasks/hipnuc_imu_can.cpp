@@ -7,10 +7,71 @@
 #include "soem_wrapper/utils/config_utils.hpp"
 #include "soem_wrapper/utils/io_utils.hpp"
 
+#include <unordered_map>
+
 namespace aim::ecat::task {
     using namespace io::little_endian;
     using namespace utils::config;
     using namespace hipnuc_imu;
+
+    namespace {
+        constexpr uint16_t SIX_IMU_PDO_SIZE = 160;
+        constexpr uint16_t SIX_IMU_DATA_SIZE = 126;
+        constexpr uint16_t HIPNUC_SAMPLE_SIZE = 21;
+        constexpr uint8_t HIPNUC_IMU_COUNT = 6;
+
+        struct SampleSequenceState {
+            bool initialized{false};
+            uint16_t last_seq{0};
+        };
+
+        std::unordered_map<const HIPNUC_IMU_CAN *, SampleSequenceState> sequence_states;
+
+        bool has_new_6imu_sample(const HIPNUC_IMU_CAN *owner,
+                                 const std::shared_ptr<SlaveDevice> &slave_device,
+                                 const uint16_t pdoread_offset) {
+            if (slave_device == nullptr || slave_device->get_slave_to_master_buf_len() < SIX_IMU_PDO_SIZE) {
+                /* Old 80/112-byte slave types do not contain sequence counters. */
+                return true;
+            }
+
+            if ((pdoread_offset % HIPNUC_SAMPLE_SIZE) != 0U) {
+                return true;
+            }
+
+            const uint16_t imu_index = pdoread_offset / HIPNUC_SAMPLE_SIZE;
+            if (imu_index >= HIPNUC_IMU_COUNT) {
+                return true;
+            }
+
+            const uint16_t sequence_offset = SIX_IMU_DATA_SIZE + imu_index * sizeof(uint16_t);
+            if (sequence_offset + sizeof(uint16_t) > slave_device->get_slave_to_master_buf().size()) {
+                return true;
+            }
+
+            int offset = sequence_offset;
+            const uint16_t seq = read_uint16(slave_device->get_slave_to_master_buf().data(), &offset);
+            auto &state = sequence_states[owner];
+
+            if (!state.initialized) {
+                /* Before the first complete P1/P2/P3 sample the slave reports seq=0.
+                 * Do not publish an all-zero/stale startup message. */
+                if (seq == 0U) {
+                    return false;
+                }
+                state.initialized = true;
+                state.last_seq = seq;
+                return true;
+            }
+
+            if (seq == state.last_seq) {
+                return false;
+            }
+
+            state.last_seq = seq;
+            return true;
+        }
+    }
 
     sensor_msgs::msg::Imu HIPNUC_IMU_CAN::sensor_msgs_imu_shared_msg;
 
@@ -60,7 +121,11 @@ namespace aim::ecat::task {
     }
 
     void HIPNUC_IMU_CAN::read() {
-        sensor_msgs_imu_shared_msg.header.stamp = slave_device_->get_current_data_stamp();;
+        if (!has_new_6imu_sample(this, slave_device_, pdoread_offset_)) {
+            return;
+        }
+
+        sensor_msgs_imu_shared_msg.header.stamp = slave_device_->get_current_data_stamp();
         sensor_msgs_imu_shared_msg.header.frame_id = conf_frame_name_;
 
         int offset = pdoread_offset_;
