@@ -471,6 +471,122 @@ ST-LINK
 
 不要再手动修改 `main.c` 的 CAN ID；三种固件已经分别构建好。
 
+### 如果 G431 提示写保护：先解除保护，再彻底断电后烧录
+
+实际部署中有些 STM32G431 bridge 会处于 Flash 写保护状态。直接烧录时可能看到类似：
+
+```text
+flash memory write protected
+flash write failed
+block write failed
+timeout waiting for algorithm
+```
+
+这种情况下不要连续反复点 Download。可以在 Ubuntu 上用 OpenOCD 先解除保护。
+
+如果没有 OpenOCD：
+
+```bash
+sudo apt update
+sudo apt install -y openocd
+```
+
+下面假设 3 种 slot 固件已经解压到：
+
+```text
+~/Downloads/hipnucimu-500hz-slots
+```
+
+进入目录：
+
+```bash
+cd ~/Downloads/hipnucimu-500hz-slots
+```
+
+先解除 G431 Flash 写保护：
+
+```bash
+openocd \
+  -f interface/stlink.cfg \
+  -f target/stm32g4x.cfg \
+  -c "adapter speed 100" \
+  -c "init" \
+  -c "halt" \
+  -c "flash probe 0" \
+  -c "flash protect 0 0 last off" \
+  -c "stm32l4x option_load 0" \
+  -c "shutdown"
+```
+
+正常情况下会看到类似：
+
+```text
+cleared protection for sectors 0 through 63
+stm32l4x option load completed. Power-on reset might be required
+```
+
+这里有一个实际踩过的坑：
+
+> `option_load` 完成后，如果立刻执行烧录，第一次仍然可能失败。不要继续重复烧。先让 G431 **彻底断电**，再重新上电。
+
+正确顺序：
+
+```text
+解除 Flash 写保护
+→ stm32l4x option_load 0
+→ G431 完全断电
+→ 如果 ST-Link 3.3V 也在给板子供电，ST-Link 供电也一起断开
+→ 等待 5~10 秒
+→ 重新上电
+→ 再执行烧录 + verify
+```
+
+以 `slot3` 为例：
+
+```bash
+cd ~/Downloads/hipnucimu-500hz-slots
+
+openocd \
+  -f interface/stlink.cfg \
+  -f target/stm32g4x.cfg \
+  -c "adapter speed 100" \
+  -c "init" \
+  -c "halt" \
+  -c "flash write_image erase hipnucimu_slot3.hex" \
+  -c "verify_image hipnucimu_slot3.hex" \
+  -c "reset run" \
+  -c "shutdown"
+```
+
+成功重点看：
+
+```text
+wrote ... bytes from file hipnucimu_slot3.hex
+verified ... bytes
+```
+
+`slot1` / `slot2` 的操作完全相同，只需要把文件名换成：
+
+```text
+hipnucimu_slot1.hex
+hipnucimu_slot2.hex
+```
+
+如果只是想确认某块 G431 现在是否已经精确刷成对应 slot，而不想重刷，可以只做非破坏性 verify。例如检查 slot3：
+
+```bash
+openocd \
+  -f interface/stlink.cfg \
+  -f target/stm32g4x.cfg \
+  -c "adapter speed 100" \
+  -c "init" \
+  -c "halt" \
+  -c "verify_image hipnucimu_slot3.hex" \
+  -c "shutdown"
+```
+
+> `verify_image` 会让 MCU 进入 halt 状态；验证完成后建议 reset 或重新断电上电再正式使用。
+
 ---
 
 # Part D：烧录 STM32H750 + AX58100
@@ -695,15 +811,193 @@ slave     = 1
 target    = ProductCode 0x00000005
 ```
 
+### 如果出现 `EEPROM read-back does not match the requested image`
+
+实际部署中遇到过一种情况：完整写入结束后，`Product Code` 已经变成 `00000005`，但脚本最终仍然报：
+
+```text
+ERROR: EEPROM read-back does not match the requested image.
+```
+
+同时 `eepromtool -i` 可能看到：
+
+```text
+Checksum         : 0067
+  calculated     : 009C
+Product Code     : 00000005
+```
+
+这说明不能只看 `Product Code = 5` 就认为刷 EEPROM 成功。必须以**完整回读 + 逐字节比较**为准。
+
+先找到脚本刚刚生成的 `after_6imu.bin`，与目标镜像比较：
+
+```bash
+cd ~/ecat_ws/src/EcatV2_Master
+
+cmp -l \
+  eeproms/58100H750_UniversalModule_6IMU_LargePDOV.bin \
+  "$(ls -t eeprom_backups/*after_6imu.bin | head -1)"
+```
+
+`cmp -l` 的字节值默认按八进制显示。我们实际遇到过下面这组固定差异：
+
+```text
+ 15 234 147
+162  66 114
+165 125 147
+166 137 145
+```
+
+对应：
+
+```text
+offset 0x0E：目标 0x9C，实际 0x67   <- SII checksum
+offset 0xA1：目标 0x36，实际 0x4C
+offset 0xA4：目标 0x55，实际 0x67
+offset 0xA5：目标 0x5F，实际 0x65
+```
+
+如果重新完整刷一次以后仍然固定差同样几个字节，不要无限重复整片刷写。可以按下面的方法修复。
+
+#### 17.1 先修 SII checksum
+
+先确认当前 alias：
+
+```bash
+sudo ./tools/eepromtool enp3s0 1 -i
+```
+
+如果看到：
+
+```text
+Config Alias     : 0000
+```
+
+执行：
+
+```bash
+sudo ./tools/eepromtool enp3s0 1 -walias 0
+```
+
+然后重新检查：
+
+```bash
+sudo ./tools/eepromtool enp3s0 1 -i
+```
+
+目标是：
+
+```text
+Checksum         : 009C
+  calculated     : 009C
+Product Code     : 00000005
+```
+
+> `-walias 0` 适用于这里 alias 本来就是 `0000` 的情况。它会保留 alias=0，并重新计算/写入 SII checksum。如果你的 `Config Alias` 不是 0000，不要机械照抄 `-walias 0`。
+
+执行 `-walias` 后偶尔可能暂时出现一次：
+
+```text
+No slaves found!
+```
+
+如果链路和供电都正常，可以稍等一下再重试 `eepromtool -i`。实际测试中下一次访问即可重新发现从站。
+
+#### 17.2 如果仍然只剩 0xA0 / 0xA4 两个 word 不一致
+
+如果 `cmp -l` 仍显示和上面的实际案例相同，即目标需要：
+
+```text
+0x00A0~0x00A1 -> 5F 36
+0x00A4~0x00A5 -> 55 5F
+```
+
+创建两个最小 Intel HEX patch：
+
+```bash
+cat >/tmp/eep_patch_a0.hex <<'EOF'
+:0200A0005F36C9
+:00000001FF
+EOF
+
+cat >/tmp/eep_patch_a4.hex <<'EOF'
+:0200A400555FA6
+:00000001FF
+EOF
+```
+
+分别写入：
+
+```bash
+sudo ./tools/eepromtool enp3s0 1 -wi /tmp/eep_patch_a0.hex
+sudo ./tools/eepromtool enp3s0 1 -wi /tmp/eep_patch_a4.hex
+```
+
+执行这种小范围 `-wi` patch 时，工具可能打印：
+
+```text
+Vendor ID        : 00000000
+Product Code     : 00000000
+```
+
+这里不要误以为真实 EEPROM 的 ProductCode 被清零了。`eepromtool` 此时打印的是这份小 Intel HEX patch 的本地缓冲区头部；真正结果要在写完后重新用 `-i` / `-r` 检查。
+
+#### 17.3 最后必须完整回读 2048B，并做到 `cmp` 无输出
+
+完整读取：
+
+```bash
+sudo ./tools/eepromtool \
+  enp3s0 \
+  1 \
+  -r /tmp/eeprom_final.bin
+```
+
+然后：
+
+```bash
+cmp -l \
+  eeproms/58100H750_UniversalModule_6IMU_LargePDOV.bin \
+  /tmp/eeprom_final.bin
+```
+
+真正成功时：
+
+```text
+cmp 不打印任何内容，直接返回 shell 提示符
+```
+
+这代表实际 AX58100 EEPROM 与目标 6-IMU EEPROM **2048 bytes 逐字节完全一致**。
+
+再检查一次：
+
+```bash
+sudo ./tools/eepromtool enp3s0 1 -i
+```
+
+至少应该满足：
+
+```text
+Checksum         : 009C
+  calculated     : 009C
+Product Code     : 00000005
+```
+
+只有做到这里，才算这次 EEPROM 烧录真正完成。
+
 ### 刷完必须断电重启从站
+
+只有当脚本直接显示 read-back 验证成功，或者经过上面的修复后最终 `cmp` 已经无输出，才进行断电重启。不要在 EEPROM 仍处于 mismatch 状态时就继续部署。
 
 不是只重启 ROS：
 
 ```text
 Slave power OFF
-等待几秒
+等待 5~10 秒
 Slave power ON
 ```
+
+AX58100 需要在重新上电后加载新的 SII/EEPROM 信息。
 
 ---
 
@@ -720,6 +1014,21 @@ sudo ./tools/eepromtool enp3s0 1 -i
 ```text
 Product Code: 0x00000005
 ```
+
+后面正式启动 Master 时还要进一步确认日志出现：
+
+```text
+Found slave id=1, sn=<真实SN>, eepid=5, type=H750UniversalModule (6-IMU Large PDO V.)
+```
+
+这才说明 Master 真正按：
+
+```text
+Master -> Slave = 80 B
+Slave  -> Master = 160 B
+```
+
+识别了 6-IMU 从站。
 
 如果还是旧值，先检查是否真的断电重启。
 
