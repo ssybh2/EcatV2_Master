@@ -9,65 +9,138 @@
 </head>
 <body>
   <header class="topbar">
-    <div>
+    <div class="brand">
       <div class="eyebrow">ssybh2 / EcatV2_Master</div>
       <h1>EtherCAT ProductCode 0x06 TaskEditor</h1>
       <p>STM32H750 + AX58100 · 6×HIPNUC IMU + DJI RC/DBUS + DShot</p>
     </div>
-    <div class="actions">
+    <div class="actions top-actions">
       <a class="button" href="https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006" target="_blank" rel="noreferrer">GitHub</a>
       <button id="resetAllButton" class="danger">恢复默认</button>
     </div>
   </header>
 
   <main class="shell">
-    <section class="banner">
-      <strong>当前 profile 已按真机验证更新：</strong>
-      ProductCode 0x06 · application PDO 80 B M→S / 192 B S→M · EtherCAT Outputs 81 B / Inputs 193 B · task_count 8 · sdo_len 91 B。
+    <section class="profile-card">
+      <div class="profile-copy">
+        <div class="profile-kicker">VERIFIED HARDWARE PROFILE</div>
+        <h2>ProductCode 0x06</h2>
+        <p>
+          <strong>当前 profile 已按真机验证更新：</strong>
+          application PDO 80 B M→S / 192 B S→M · EtherCAT Outputs 81 B / Inputs 193 B · task_count 8 · sdo_len 91 B。
+        </p>
+      </div>
+      <div class="profile-stats" aria-label="ProductCode 0x06 profile summary">
+        <div class="stat"><span>ProductCode</span><strong>0x06</strong></div>
+        <div class="stat"><span>M→S App PDO</span><strong>80 B</strong></div>
+        <div class="stat"><span>S→M App PDO</span><strong>192 B</strong></div>
+        <div class="stat"><span>Tasks</span><strong>8</strong></div>
+      </div>
     </section>
 
-    <section class="layout-card">
-      <h2>固定 PDO 布局</h2>
-      <div class="memory">
-        <span>IMU1<br>0–20</span><span>IMU2<br>21–41</span><span>IMU3<br>42–62</span>
-        <span>IMU4<br>63–83</span><span>IMU5<br>84–104</span><span>IMU6<br>105–125</span>
-        <span class="diag">Diagnostics<br>126–159</span><span class="rc">DJI RC<br>160–178</span>
-        <span class="reserved">Reserved<br>179–191</span>
-      </div>
-      <div class="memory small">
-        <span class="dshot">DShot 4×uint16<br>0–7</span><span class="reserved wide">Reserved M→S<br>8–79</span>
-      </div>
-      <p class="hint">前 6 个 task 必须保持 HIPNUC IMU；Task 7 固定为 DJI RC，Task 8 固定为 DShot。</p>
-    </section>
+    <nav class="view-tabs" aria-label="TaskEditor views">
+      <button class="view-tab active" type="button" data-view="settings" aria-selected="true">
+        <span class="tab-index">01</span>
+        <span><strong>Module Settings</strong><small>配置模块与 8 个 Task</small></span>
+      </button>
+      <button class="view-tab" type="button" data-view="config" aria-selected="false">
+        <span class="tab-index">02</span>
+        <span><strong>Generated config.yaml</strong><small>查看、复制与下载实时配置</small></span>
+      </button>
+    </nav>
 
-    <section class="toolbar">
-      <div>
-        <h2>Module Settings</h2>
-        <p>可以编辑 SN、IMU CAN ID/topic/frame、DJI RC topic 和 DShot 安全参数。</p>
-      </div>
-      <button id="addModuleButton" class="primary">+ Add 0x06 Module</button>
-    </section>
+    <section id="settingsView" class="view">
+      <section class="layout-card">
+        <div class="section-heading">
+          <div>
+            <div class="section-kicker">PDO MAP</div>
+            <h2>固定 PDO 布局</h2>
+          </div>
+          <span class="profile-pill">0x06 fixed layout</span>
+        </div>
 
-    <div id="moduleList"></div>
+        <div class="memory-label">Slave → Master · 192 B application PDO</div>
+        <div class="memory">
+          <span>IMU1<br>0–20</span><span>IMU2<br>21–41</span><span>IMU3<br>42–62</span>
+          <span>IMU4<br>63–83</span><span>IMU5<br>84–104</span><span>IMU6<br>105–125</span>
+          <span class="diag">Diagnostics<br>126–159</span><span class="rc">DJI RC<br>160–178</span>
+          <span class="reserved">Reserved<br>179–191</span>
+        </div>
 
-    <section class="generator-grid">
-      <div>
-        <div id="validationSummary"></div>
-        <div class="panel">
-          <h2>PDO / SDO Overview</h2>
+        <div class="memory-label second">Master → Slave · 80 B application PDO</div>
+        <div class="memory small">
+          <span class="dshot">DShot 4×uint16<br>0–7</span><span class="reserved wide">Reserved M→S<br>8–79</span>
+        </div>
+        <p class="hint">前 6 个 task 必须保持 HIPNUC IMU；Task 7 固定为 DJI RC，Task 8 固定为 DShot。</p>
+      </section>
+
+      <section class="toolbar">
+        <div>
+          <div class="section-kicker">CONFIGURATION</div>
+          <h2>Module Settings</h2>
+          <p>可以编辑 SN、IMU CAN ID/topic/frame、DJI RC topic 和 DShot 安全参数。</p>
+        </div>
+        <button id="addModuleButton" class="primary">+ Add 0x06 Module</button>
+      </section>
+
+      <div id="moduleList"></div>
+
+      <section class="settings-summary-grid">
+        <div>
+          <div id="validationSummary"></div>
+        </div>
+        <div class="panel overview-panel">
+          <div class="section-heading compact">
+            <div>
+              <div class="section-kicker">RESOURCE CHECK</div>
+              <h2>PDO / SDO Overview</h2>
+            </div>
+          </div>
           <div id="pdoOverview"></div>
         </div>
-      </div>
-      <div class="panel yaml-panel">
-        <div class="panel-head">
-          <div><h2>config.yaml</h2><p>实时生成。</p></div>
+      </section>
+
+      <section class="next-step-card">
+        <div>
+          <div class="section-kicker">NEXT STEP</div>
+          <h2>配置完成后查看实时 YAML</h2>
+          <p>当前表单变化会持续更新生成结果；切换界面不会丢失模块设置。</p>
+        </div>
+        <button id="openConfigButton" class="primary large">Open Generated config.yaml →</button>
+      </section>
+    </section>
+
+    <section id="configView" class="view" hidden>
+      <section class="config-workspace">
+        <div class="config-header">
+          <div>
+            <div class="section-kicker">LIVE OUTPUT</div>
+            <h2>Generated config.yaml</h2>
+            <p>由当前 Module Settings 实时生成。核心 generator、PDO offset 与 SDO 计算逻辑保持不变。</p>
+          </div>
           <div class="actions">
+            <button id="backToSettingsButton">← Module Settings</button>
             <button id="copyYamlButton">Copy</button>
             <button id="downloadYamlButton" class="primary">Download</button>
           </div>
         </div>
-        <pre id="yamlPreview"></pre>
-      </div>
+
+        <div class="config-meta-bar">
+          <span id="configStateBadge" class="status ok">Ready</span>
+          <span id="configModuleSummary">—</span>
+          <span>ProductCode 0x06</span>
+          <span>task_count 8 / module</span>
+        </div>
+
+        <div class="yaml-panel">
+          <div class="code-titlebar">
+            <div class="code-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+            <strong>config.yaml</strong>
+            <span>live preview</span>
+          </div>
+          <pre id="yamlPreview"></pre>
+        </div>
+      </section>
     </section>
   </main>
 

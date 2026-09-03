@@ -13,7 +13,15 @@
   const resetAllButton = document.getElementById('resetAllButton');
   const versionText = document.getElementById('versionText');
   const toastNode = document.getElementById('toast');
+  const settingsView = document.getElementById('settingsView');
+  const configView = document.getElementById('configView');
+  const viewButtons = Array.from(document.querySelectorAll('[data-view]'));
+  const openConfigButton = document.getElementById('openConfigButton');
+  const backToSettingsButton = document.getElementById('backToSettingsButton');
+  const configStateBadge = document.getElementById('configStateBadge');
+  const configModuleSummary = document.getElementById('configModuleSummary');
   let toastTimer = null;
+  let activeView = 'settings';
 
   versionText.textContent = C.VERSION;
 
@@ -49,6 +57,24 @@
     toastNode.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toastNode.classList.remove('show'), 2200);
+  }
+
+  function setActiveView(view) {
+    activeView = view === 'config' ? 'config' : 'settings';
+    const showSettings = activeView === 'settings';
+    settingsView.hidden = !showSettings;
+    configView.hidden = showSettings;
+
+    viewButtons.forEach((button) => {
+      const selected = button.dataset.view === activeView;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-selected', selected ? 'true' : 'false');
+    });
+
+    if (activeView === 'config') {
+      requestAnimationFrame(() => yamlPreview.focus({ preventScroll: true }));
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function nextSn() {
@@ -189,6 +215,18 @@
       </div>`;
     }).join('');
 
+    if (validation.errors.length) {
+      configStateBadge.textContent = `${validation.errors.length} errors`;
+      configStateBadge.className = 'status bad';
+    } else if (validation.warnings.length) {
+      configStateBadge.textContent = `${validation.warnings.length} warnings`;
+      configStateBadge.className = 'status warn';
+    } else {
+      configStateBadge.textContent = 'Ready';
+      configStateBadge.className = 'status ok';
+    }
+    configModuleSummary.textContent = `${state.modules.length} module${state.modules.length === 1 ? '' : 's'} · ${state.modules.length * 8} tasks total`;
+
     copyButton.disabled = validation.errors.length > 0;
     downloadButton.disabled = validation.errors.length > 0;
   }
@@ -283,5 +321,13 @@
     toast('config.yaml 已下载');
   });
 
+  viewButtons.forEach((button) => {
+    button.addEventListener('click', () => setActiveView(button.dataset.view));
+  });
+  openConfigButton.addEventListener('click', () => setActiveView('config'));
+  backToSettingsButton.addEventListener('click', () => setActiveView('settings'));
+
+  yamlPreview.setAttribute('tabindex', '-1');
   render();
+  setActiveView(activeView);
 })();
