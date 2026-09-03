@@ -1,6 +1,6 @@
-# 6 个 IMU × 500 Hz EtherCAT 完整部署教程（小白版）
+# ProductCode 0x06：6 IMU + DJI RC + DShot EtherCAT 完整部署教程（小白版）
 
-> 这是一份从 **空 Ubuntu 环境** 一直走到 **6 个 HI92 IMU 全部 500 Hz 工作** 的完整教程。
+> 这是一份从 **空 Ubuntu 环境** 一直走到 **6 个 HI92 IMU、DJI RC 和 DShot 全部通过 EtherCAT 工作** 的完整教程。
 >
 > 它不是另起炉灶，而是把原版 AIMEtherCAT 的三条教程路线：
 >
@@ -8,7 +8,7 @@
 > 2. [First Run Test（原版）](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/first-run-test.md)
 > 3. [Configuration Generator（原版）](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/configuration-generator.md)
 >
-> 与我们新增的 **6-IMU 固件、ProductCode 0x05、160B PDO、6-IMU TaskEditor 和压力测试** 合并成一条完整流程。
+> 与我们新增的 **ProductCode 0x06 固件、192B S→M PDO、6IMU + DJI RC + DShot、8-task TaskEditor 和压力测试** 合并成一条完整流程。
 >
 > 最终启动命令与原仓库保持一致：
 >
@@ -18,8 +18,8 @@
 >
 > 适用分支：
 >
-> - Master：`ssybh2/EcatV2_Master -> feature/6imu-large-pdo`
-> - H750 Slave：`ssybh2/EcatV2_AX58100_H750_Universal -> feature/6imu-large-pdo`
+> - Master：`ssybh2/EcatV2_Master -> feature/6imu-rc-dshot-pdo-v006`
+> - H750 Slave：`ssybh2/EcatV2_AX58100_H750_Universal -> feature/6imu-rc-dshot-pdo-v006`
 > - HIPNUC bridge：`ssybh2/hipnucimu -> feature/6imu-500hz-stable`
 
 ---
@@ -51,12 +51,18 @@ CAN1 @ 1 Mbps                       CAN2 @ 1 Mbps
 EtherCAT 设备身份：
 
 ```text
-ProductCode / eepid = 0x00000005
-Master -> Slave PDO = 80 B
-Slave  -> Master PDO = 160 B
+ProductCode / eepid = 0x00000006
+
+Application PDO:
+Master -> Slave = 80 B
+Slave  -> Master = 192 B
+
+EtherCAT process data:
+Outputs = 81 B
+Inputs  = 193 B
 ```
 
-Slave→Master 160B：
+Slave→Master 192B application region：
 
 ```text
 0..20     IMU1
@@ -66,9 +72,26 @@ Slave→Master 160B：
 84..104   IMU5
 105..125  IMU6
 126..159  diagnostics
+160..178  DJI RC / DBUS (19 B)
+179..191  reserved
 ```
 
-六个 IMU 的原始数据占 126B，后 34B 是序号、CAN FIFO 和完整性诊断。
+Master→Slave 80B application region：
+
+```text
+0..7      DShot (4 × uint16)
+8..79     reserved
+```
+
+EtherCAT 自身还各有 1B 状态字段，因此最终是：
+
+```text
+SM2 / Outputs = 81 B
+SM3 / Inputs  = 193 B
+```
+
+前 126B 是六个 IMU 数据，126..159 是原有诊断区，
+160..178 是 DJI RC；DShot 使用 M→S offset 0..7。
 
 ---
 
@@ -124,7 +147,7 @@ Ubuntu 22.04 + ROS 2 Humble
 
 也能工作。
 
-我们的 `feature/6imu-large-pdo` CI 当前就是在：
+我们的 `feature/6imu-rc-dshot-pdo-v006` CI 当前就是在：
 
 ```text
 Ubuntu 22.04
@@ -306,7 +329,7 @@ git submodule add \
 
 ```bash
 cd ~/ecat_ws/src/EcatV2_Master
-git checkout feature/6imu-large-pdo
+git checkout feature/6imu-rc-dshot-pdo-v006
 git submodule update --init --recursive
 ```
 
@@ -319,7 +342,7 @@ git branch --show-current
 应该输出：
 
 ```text
-feature/6imu-large-pdo
+feature/6imu-rc-dshot-pdo-v006
 ```
 
 ### 以后更新 Master
@@ -591,33 +614,37 @@ openocd \
 
 # Part D：烧录 STM32H750 + AX58100
 
-## 11. 下载 H750 从站固件
+## 11. 下载 ProductCode 0x06 H750 从站固件
 
-打开：
+正式部署优先使用已经完成真机验证的 GitHub Release：
 
+```text
+https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/releases
+```
+
+选择 `v0.6.0`，推荐下载：
+
+```text
+EcatV2_AX58100_H750_Universal_v0.6.0.elf
+EcatV2_AX58100_H750_Universal_v0.6.0.hex
+EcatV2_AX58100_H750_Universal_v0.6.0.bin
+AX58100_EEPROM_ProductCode_0x06.bin
+SHA256SUMS.txt
+```
+
+第一次烧 H750 推荐使用 `.elf`。
+
+如果需要最新开发构建，也可以打开：
+
+```text
 https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/actions
-
-选择 `feature/6imu-large-pdo` 最新绿色：
-
-```text
-Build 6-IMU Slave Firmware
 ```
 
-下载：
+选择当前 `feature/6imu-rc-dshot-pdo-v006` 分支的
+`Build ProductCode 0x06 Slave Firmware`，下载 Actions artifact。
 
-```text
-six-imu-slave-firmware
-```
-
-应包含：
-
-```text
-EcatV2_AX58100_H750_Universal.elf
-EcatV2_AX58100_H750_Universal.hex
-EcatV2_AX58100_H750_Universal.bin
-```
-
-第一次推荐 `.elf` 或 `.hex`。
+> Release 保存经过硬件验证的稳定版本；Actions artifact 保存最新开发构建。
+> 正式部署优先使用 Release。
 
 ---
 
@@ -737,46 +764,43 @@ EtherCAT NIC = enp3s0
 
 ---
 
-# Part F：刷 ProductCode 0x05 EEPROM
+# Part F：刷 ProductCode 0x06 EEPROM
 
-这一部分对应原版 [Environment Setup](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/environment-setup.md) 的 EEPROM 步骤，但我们用安全脚本替代直接 `eepromtool -w`。
+本版本使用已经完成真机验证的 2048-byte AX58100 EEPROM 镜像。
 
-## 16. 先确认能看到从站
+当前板卡的 SII 中没有静态 RxPDO/TxPDO category；81B / 193B 的
+process-data mapping 由 H750 上的 SOES / CoE Object Dictionary 动态提供。
+因此 ProductCode 0x06 EEPROM 基于已知可工作的 0x05 SII，仅修改
+ProductCode 字段 `0x05 -> 0x06`，无需为 192B PDO 重新生成静态 SII PDO category。
+
+## 16. 先确认能看到目标从站
 
 ```bash
 cd ~/ecat_ws/src/EcatV2_Master
 
-chmod +x tools/*
+chmod +x tools/eepromtool tools/slaveinfo
+sudo ./tools/eepromtool enp3s0 1 -i
 sudo ./tools/slaveinfo enp3s0
 ```
 
-### 成功标准
-
-至少看到一个 EtherCAT slave。
-
-如果显示 0：
+如果当前仍是旧 EEPROM，通常会看到：
 
 ```text
-先停下来，不要刷 EEPROM。
+Product Code     : 00000005
 ```
 
-检查：
-
-```text
-网卡名
-网线是否插 Slave IN
-AX58100/H750 是否供电
-LINK 灯
-```
+在写 EEPROM 前必须能够找到目标 slave。完全找不到 slave 时不要写 EEPROM，
+先检查网卡、网线、Slave IN、供电和 LINK 状态。
 
 ---
 
-## 17. 安全刷 0x05 EEPROM
+## 17. 安全刷 ProductCode 0x06 EEPROM
 
-第一次只有一块 slave 时，slave id 通常是：
+Master 仓库提供：
 
 ```text
-1
+eeproms/58100H750_UniversalModule_6IMU_RC_DSHOT.bin
+tools/flash_6imu_rc_dshot_eeprom.sh
 ```
 
 执行：
@@ -784,226 +808,21 @@ LINK 灯
 ```bash
 cd ~/ecat_ws/src/EcatV2_Master
 
-chmod +x tools/flash_6imu_eeprom.sh tools/eepromtool
-./tools/flash_6imu_eeprom.sh enp3s0 1
+chmod +x tools/eepromtool tools/flash_6imu_rc_dshot_eeprom.sh
+./tools/flash_6imu_rc_dshot_eeprom.sh enp3s0 1
 ```
 
-脚本会：
+脚本会先读取并备份当前 EEPROM，再要求人工输入 `WRITE`，随后写入、完整读回并验证。
 
-```text
-检查 2048B 镜像
-确认 ProductCode = 0x05
-确认 6IMU_PDO 标记
-读取当前 EEPROM
-备份原 EEPROM
-要求输入 WRITE
-写新 EEPROM
-重新读回
-逐字节 cmp
-再次显示 EEPROM 信息
-```
-
-输入 `WRITE` 前再次确认：
+输入 `WRITE` 前确认：
 
 ```text
 interface = enp3s0
 slave     = 1
-target    = ProductCode 0x00000005
+target    = ProductCode 0x00000006
 ```
 
-### 如果出现 `EEPROM read-back does not match the requested image`
-
-实际部署中遇到过一种情况：完整写入结束后，`Product Code` 已经变成 `00000005`，但脚本最终仍然报：
-
-```text
-ERROR: EEPROM read-back does not match the requested image.
-```
-
-同时 `eepromtool -i` 可能看到：
-
-```text
-Checksum         : 0067
-  calculated     : 009C
-Product Code     : 00000005
-```
-
-这说明不能只看 `Product Code = 5` 就认为刷 EEPROM 成功。必须以**完整回读 + 逐字节比较**为准。
-
-先找到脚本刚刚生成的 `after_6imu.bin`，与目标镜像比较：
-
-```bash
-cd ~/ecat_ws/src/EcatV2_Master
-
-cmp -l \
-  eeproms/58100H750_UniversalModule_6IMU_LargePDOV.bin \
-  "$(ls -t eeprom_backups/*after_6imu.bin | head -1)"
-```
-
-`cmp -l` 的字节值默认按八进制显示。我们实际遇到过下面这组固定差异：
-
-```text
- 15 234 147
-162  66 114
-165 125 147
-166 137 145
-```
-
-对应：
-
-```text
-offset 0x0E：目标 0x9C，实际 0x67   <- SII checksum
-offset 0xA1：目标 0x36，实际 0x4C
-offset 0xA4：目标 0x55，实际 0x67
-offset 0xA5：目标 0x5F，实际 0x65
-```
-
-如果重新完整刷一次以后仍然固定差同样几个字节，不要无限重复整片刷写。可以按下面的方法修复。
-
-#### 17.1 先修 SII checksum
-
-先确认当前 alias：
-
-```bash
-sudo ./tools/eepromtool enp3s0 1 -i
-```
-
-如果看到：
-
-```text
-Config Alias     : 0000
-```
-
-执行：
-
-```bash
-sudo ./tools/eepromtool enp3s0 1 -walias 0
-```
-
-然后重新检查：
-
-```bash
-sudo ./tools/eepromtool enp3s0 1 -i
-```
-
-目标是：
-
-```text
-Checksum         : 009C
-  calculated     : 009C
-Product Code     : 00000005
-```
-
-> `-walias 0` 适用于这里 alias 本来就是 `0000` 的情况。它会保留 alias=0，并重新计算/写入 SII checksum。如果你的 `Config Alias` 不是 0000，不要机械照抄 `-walias 0`。
-
-执行 `-walias` 后偶尔可能暂时出现一次：
-
-```text
-No slaves found!
-```
-
-如果链路和供电都正常，可以稍等一下再重试 `eepromtool -i`。实际测试中下一次访问即可重新发现从站。
-
-#### 17.2 如果仍然只剩 0xA0 / 0xA4 两个 word 不一致
-
-如果 `cmp -l` 仍显示和上面的实际案例相同，即目标需要：
-
-```text
-0x00A0~0x00A1 -> 5F 36
-0x00A4~0x00A5 -> 55 5F
-```
-
-创建两个最小 Intel HEX patch：
-
-```bash
-cat >/tmp/eep_patch_a0.hex <<'EOF'
-:0200A0005F36C9
-:00000001FF
-EOF
-
-cat >/tmp/eep_patch_a4.hex <<'EOF'
-:0200A400555FA6
-:00000001FF
-EOF
-```
-
-分别写入：
-
-```bash
-sudo ./tools/eepromtool enp3s0 1 -wi /tmp/eep_patch_a0.hex
-sudo ./tools/eepromtool enp3s0 1 -wi /tmp/eep_patch_a4.hex
-```
-
-执行这种小范围 `-wi` patch 时，工具可能打印：
-
-```text
-Vendor ID        : 00000000
-Product Code     : 00000000
-```
-
-这里不要误以为真实 EEPROM 的 ProductCode 被清零了。`eepromtool` 此时打印的是这份小 Intel HEX patch 的本地缓冲区头部；真正结果要在写完后重新用 `-i` / `-r` 检查。
-
-#### 17.3 最后必须完整回读 2048B，并做到 `cmp` 无输出
-
-完整读取：
-
-```bash
-sudo ./tools/eepromtool \
-  enp3s0 \
-  1 \
-  -r /tmp/eeprom_final.bin
-```
-
-然后：
-
-```bash
-cmp -l \
-  eeproms/58100H750_UniversalModule_6IMU_LargePDOV.bin \
-  /tmp/eeprom_final.bin
-```
-
-真正成功时：
-
-```text
-cmp 不打印任何内容，直接返回 shell 提示符
-```
-
-这代表实际 AX58100 EEPROM 与目标 6-IMU EEPROM **2048 bytes 逐字节完全一致**。
-
-再检查一次：
-
-```bash
-sudo ./tools/eepromtool enp3s0 1 -i
-```
-
-至少应该满足：
-
-```text
-Checksum         : 009C
-  calculated     : 009C
-Product Code     : 00000005
-```
-
-只有做到这里，才算这次 EEPROM 烧录真正完成。
-
-### 刷完必须断电重启从站
-
-只有当脚本直接显示 read-back 验证成功，或者经过上面的修复后最终 `cmp` 已经无输出，才进行断电重启。不要在 EEPROM 仍处于 mismatch 状态时就继续部署。
-
-不是只重启 ROS：
-
-```text
-Slave power OFF
-等待 5~10 秒
-Slave power ON
-```
-
-AX58100 需要在重新上电后加载新的 SII/EEPROM 信息。
-
----
-
-## 18. 确认 ProductCode
-
-重新执行：
+成功后检查：
 
 ```bash
 sudo ./tools/eepromtool enp3s0 1 -i
@@ -1012,25 +831,67 @@ sudo ./tools/eepromtool enp3s0 1 -i
 目标：
 
 ```text
-Product Code: 0x00000005
+Product Code     : 00000006
+Checksum         : 009C
+  calculated     : 009C
+Size             : 000F = 2048 bytes
 ```
 
-后面正式启动 Master 时还要进一步确认日志出现：
+### 写完 EEPROM 后必须整块从站彻底断电
+
+不是只 reset H750。
 
 ```text
-Found slave id=1, sn=<真实SN>, eepid=5, type=H750UniversalModule (6-IMU Large PDO V.)
+STM32H750 + AX58100 power OFF
+等待 2~5 秒
+power ON
 ```
 
-这才说明 Master 真正按：
+AX58100 会在重新上电后加载 EEPROM/SII。
+
+---
+
+## 18. 最终确认 ProductCode 和 PDO
+
+```bash
+cd ~/ecat_ws/src/EcatV2_Master
+
+sudo ./tools/eepromtool enp3s0 1 -i
+sudo ./tools/slaveinfo enp3s0
+```
+
+最终目标：
 
 ```text
-Master -> Slave = 80 B
-Slave  -> Master = 160 B
+Product Code     : 00000006
+
+ID: 00000006
+Output size: 648bits
+Input size: 1544bits
+State: 4
+
+SM2 ... L: 81
+SM3 ... L:193
 ```
 
-识别了 6-IMU 从站。
+也就是：
 
-如果还是旧值，先检查是否真的断电重启。
+```text
+ProductCode = 0x06
+Application M->S = 80 B
+Application S->M = 192 B
+EtherCAT Outputs = 81 B
+EtherCAT Inputs  = 193 B
+SAFE_OP 正常
+```
+
+后面 ROS 2 Master 正式启动后还应看到：
+
+```text
+Found slave id=1, sn=<真实SN>, eepid=6
+SDO configured ... sdolen=91
+Operational state reached for all slaves.
+```
 
 ---
 
@@ -1066,9 +927,9 @@ SN = 1234567
 ```bash
 cd ~/ecat_ws/src/EcatV2_Master
 
-chmod +x tools/prepare_6imu_bringup.sh
+chmod +x tools/prepare_6imu_rc_dshot_bringup.sh
 
-./tools/prepare_6imu_bringup.sh \
+./tools/prepare_6imu_rc_dshot_bringup.sh \
   1234567 \
   enp3s0 \
   0 \
@@ -1236,7 +1097,7 @@ ros2 launch soem_bringup bringup.launch.py
 类似：
 
 ```text
-Found slave id=1, sn=2883658, eepid=5, type=H750UniversalModule (6-IMU Large PDO V.)
+Found slave id=1, sn=2883658, eepid=6, type=H750UniversalModule (6-IMU + RC + DSHOT)
 ```
 
 其中：
@@ -1261,7 +1122,7 @@ Found slave id=1, sn=2883658, eepid=5, type=H750UniversalModule (6-IMU Large PDO
 
 ---
 
-## 23A. 推荐：使用我们的 6-IMU TaskEditor
+## 23A. 推荐：使用 ProductCode 0x06 8-task TaskEditor
 
 在线网页：
 
@@ -1269,7 +1130,7 @@ https://ssybh2.github.io/EcatV2_Master/
 
 源码：
 
-https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo/web/6imu-task-editor
+https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006/web/6imu-task-editor
 
 ### Step 1：Module Settings
 
@@ -1307,9 +1168,11 @@ CAN2 Slot3 -> 07/08/09 -> offset 105
 确认：
 
 ```text
-task_count = 6
-sdo_len = 85
-Slave -> Master = 160B
+task_count = 8
+sdo_len = 91
+Slave -> Master = 192B
+DJI RC = Task 7 @ read offset 160
+DShot  = Task 8 @ write offset 0
 ```
 
 并且没有红色错误。
@@ -1351,7 +1214,7 @@ src/soem_wrapper/config/
 ```bash
 cd ~/ecat_ws/src/EcatV2_Master
 
-./tools/prepare_6imu_bringup.sh \
+./tools/prepare_6imu_rc_dshot_bringup.sh \
   2883658 \
   enp3s0 \
   0 \
@@ -1409,7 +1272,7 @@ ros2 launch soem_bringup bringup.launch.py
 
 ```text
 1 slaves found
-Found slave id=1, sn=<真实SN>, eepid=5
+Found slave id=1, sn=<真实SN>, eepid=6
 SDO configured ...
 Slaves mapped, state to SAFE_OP.
 All slaves reached SAFE_OP, state to OP
@@ -1421,7 +1284,7 @@ slave id 1 confirmed ready
 重点是：
 
 ```text
-eepid=5
+eepid=6
 SAFE_OP
 OP
 Initialization succeeded
@@ -1451,6 +1314,8 @@ ros2 topic list
 /imu/can2/slot1
 /imu/can2/slot2
 /imu/can2/slot3
+/dji_rc
+/dshot
 ```
 
 以及 latency topic，例如：
@@ -1476,6 +1341,29 @@ linear_acceleration
 ```
 
 不要只看 topic 名存在；必须确认数值不是一直全 0。
+
+### 同时检查 DJI RC
+
+```bash
+ros2 topic echo /dji_rc
+```
+
+操作遥控器摇杆、拨杆等控制量，数据应实时变化。
+
+```bash
+ros2 topic hz /dji_rc
+```
+
+### 检查 DShot ROS 2 接口
+
+```bash
+ros2 topic info /dshot -v
+ros2 interface show custom_msgs/msg/WriteDSHOT
+```
+
+第一次部署先确认 topic/type/QoS 正常。真正进行非零 DShot 输出前，
+应确保电机、桨叶和执行机构处于安全测试状态。
+
 
 ---
 
@@ -1561,7 +1449,7 @@ ros2 topic echo <topic> --once
 
 ### 30.3 EtherCAT 主站日志
 
-我们的 Master 会监测 160B PDO 诊断区。
+我们的 Master 会监测 192B S→M PDO，其中 126..159 仍是 6-IMU 诊断区。
 
 正常情况下不应该持续出现：
 
@@ -1696,7 +1584,7 @@ Master CPU load
 
 # Part K：最终验收标准
 
-## 32. 6-IMU 系统通过的最低标准
+## 32. ProductCode 0x06 系统通过的最低标准
 
 满载运行至少 30 分钟：
 
@@ -1708,9 +1596,11 @@ CAN2 = 3 IMU
 并满足：
 
 ```text
-6 个 ROS topic 都持续存在
-6 个 topic 都接近 500 Hz
-数据随传感器运动正常变化
+6 个 IMU ROS topic 都持续存在
+6 个 IMU topic 都接近 500 Hz
+IMU 数据随传感器运动正常变化
+DJI RC /dji_rc 数据随遥控器操作正常变化
+DShot /dshot ROS 2 接口正常
 incomplete counter 不持续增长
 CAN FIFO lost 不持续增长
 CAN FIFO full 不持续增长
@@ -1783,7 +1673,7 @@ sudo ./tools/eepromtool enp3s0 1 -i
 ```bash
 cd ~/ecat_ws/src/EcatV2_Master
 
-./tools/prepare_6imu_bringup.sh \
+./tools/prepare_6imu_rc_dshot_bringup.sh \
   <真实SN> \
   <EtherCAT网卡> \
   <RT_CPU> \
@@ -1794,17 +1684,17 @@ cd ~/ecat_ws/src/EcatV2_Master
 
 # Part M：相关入口
 
-## 6-IMU TaskEditor
+## ProductCode 0x06 · 8-task TaskEditor
 
 https://ssybh2.github.io/EcatV2_Master/
 
 ## TaskEditor 源码
 
-https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo/web/6imu-task-editor
+https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006/web/6imu-task-editor
 
 ## Master 分支
 
-https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo
+https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006
 
 ## 原版 AIMEtherCAT 教程
 
