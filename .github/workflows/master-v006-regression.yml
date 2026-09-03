@@ -1,0 +1,21 @@
+name: Validate ProductCode 0x06 Master
+
+on:
+  push:
+    branches:
+      - "feature/6imu-rc-dshot-pdo-v006"
+    paths:
+      - "src/soem_wrapper/**"
+      - "tests/test_imu_every_pdo_read_policy.py"
+      - ".github/workflows/master-v006-regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Verify 6-IMU every-PDO read contract
+        run: python3 tests/test_imu_every_pdo_read_policy.py
