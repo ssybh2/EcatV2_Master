@@ -329,6 +329,21 @@ namespace aim::ecat {
     }
 
     void SlaveDevice::process_pdo(const rclcpp::Time &current_time) {
+        const auto read_every_pdo = [this](const auto &task_wrapper) {
+            return slave_to_master_buf_len_ >= 160 &&
+                   task_wrapper->get_type_id() == task::HIPNUC_IMU_CAN_APP_ID;
+        };
+
+        // 6-IMU ProductCode 0x05/0x06 expose per-IMU sample sequence counters.
+        // Inspect those HIPNUC tasks on every received PDO so a new 500 Hz sample
+        // is not hidden behind the slower master_status/slave_status latency handshake.
+        current_data_stamp_ = current_time;
+        for (const auto &task_wrapper: task_list_) {
+            if (task_wrapper->has_publishers() && read_every_pdo(task_wrapper)) {
+                task_wrapper->read();
+            }
+        }
+
         // latency calc
         // if the slaves works well
         // master will continuous sending an incremental number in master_status
@@ -349,9 +364,9 @@ namespace aim::ecat {
                 master_status_++;
             }
 
-            for (const auto &task: task_list_) {
-                if (task->has_publishers()) {
-                    task->read();
+            for (const auto &task_wrapper: task_list_) {
+                if (task_wrapper->has_publishers() && !read_every_pdo(task_wrapper)) {
+                    task_wrapper->read();
                 }
             }
         }
