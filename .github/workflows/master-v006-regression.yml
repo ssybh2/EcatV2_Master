@@ -9,6 +9,7 @@ on:
       - "src/custom_msgs/**"
       - "src/soem/**"
       - "tests/test_imu_every_pdo_read_policy.py"
+      - "tests/test_raw_pdo_gap_diagnostic.py"
       - ".github/workflows/master-v006-regression.yml"
   workflow_dispatch:
 
@@ -26,6 +27,9 @@ jobs:
 
       - name: Verify 6-IMU every-PDO read contract
         run: python3 tests/test_imu_every_pdo_read_policy.py
+
+      - name: Verify raw PDO gap diagnostic contract
+        run: python3 tests/test_raw_pdo_gap_diagnostic.py
 
       - name: Setup ROS 2 Humble
         uses: ros-tooling/setup-ros@v0.7
