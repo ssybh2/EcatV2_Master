@@ -151,14 +151,14 @@
       'dshot'
     );
 
-    return `<article class="module-card">
+    return `<article class="module-card" data-module-index="${mi}">
       <div class="module-head">
         <div>
           <h2>H750 Universal Module — ProductCode 0x06</h2>
           <p>80 B M→S / 192 B S→M · 6 IMU + diagnostics + DJI RC + DShot</p>
         </div>
         <div class="actions">
-          <span class="status ${statusClass}">${status}</span>
+          <span class="status ${statusClass}" data-role="module-status">${status}</span>
           <button data-action="duplicate" data-mi="${mi}">Duplicate</button>
           <button data-action="reset" data-mi="${mi}">Reset</button>
           <button class="danger" data-action="delete" data-mi="${mi}">Delete</button>
@@ -181,11 +181,29 @@
     </article>`;
   }
 
-  function render() {
-    const validation = C.validateModules(state.modules);
-    moduleList.innerHTML = state.modules.map((m, i) =>
-      moduleHtml(m, i, validation.perModule[i] || {errors:[], warnings:[]})
-    ).join('');
+  function updateModuleStatusBadges(validation) {
+    state.modules.forEach((_, mi) => {
+      const local = validation.perModule[mi] || {errors: [], warnings: []};
+      const card = moduleList.querySelector(`[data-module-index="${mi}"]`);
+      const badge = card && card.querySelector('[data-role="module-status"]');
+      if (!badge) return;
+
+      if (local.errors.length) {
+        badge.textContent = `${local.errors.length} errors`;
+        badge.className = 'status bad';
+      } else if (local.warnings.length) {
+        badge.textContent = `${local.warnings.length} warnings`;
+        badge.className = 'status warn';
+      } else {
+        badge.textContent = 'Ready';
+        badge.className = 'status ok';
+      }
+      badge.dataset.role = 'module-status';
+    });
+  }
+
+  function refreshDerivedViews(validation = C.validateModules(state.modules)) {
+    updateModuleStatusBadges(validation);
 
     if (validation.errors.length) {
       validationSummary.innerHTML = `<div class="validation badbox"><strong>不能生成：</strong><ul>${
@@ -231,6 +249,14 @@
     downloadButton.disabled = validation.errors.length > 0;
   }
 
+  function render() {
+    const validation = C.validateModules(state.modules);
+    moduleList.innerHTML = state.modules.map((m, i) =>
+      moduleHtml(m, i, validation.perModule[i] || {errors:[], warnings:[]})
+    ).join('');
+    refreshDerivedViews(validation);
+  }
+
   moduleList.addEventListener('input', (ev) => {
     const t = ev.target;
     const mi = Number(t.dataset.mi);
@@ -238,7 +264,13 @@
     const m = state.modules[mi];
     const kind = t.dataset.kind;
 
-    if (kind === 'sn') C.updateSn(m, t.value);
+    if (kind === 'sn') {
+      C.updateSn(m, t.value);
+      const latencyInput = moduleList.querySelector(`input[data-mi="${mi}"][data-kind="latency"]`);
+      if (latencyInput && latencyInput.value !== m.latencyTopic) {
+        latencyInput.value = m.latencyTopic;
+      }
+    }
     else if (kind === 'latency') { m.latencyTopic = t.value; m.latencyAuto = false; }
     else if (kind === 'imu-id') m.imus[Number(t.dataset.ii)].ids[Number(t.dataset.pi)] = t.value;
     else if (kind === 'imu-topic') m.imus[Number(t.dataset.ii)].topic = t.value;
@@ -248,7 +280,7 @@
     else if (kind === 'dshot-id') m.dshot.dshotId = Number(t.value);
     else if (kind === 'dshot-init') m.dshot.initValue = Number(t.value);
     save();
-    render();
+    refreshDerivedViews();
   });
 
   moduleList.addEventListener('change', (ev) => {
@@ -257,7 +289,8 @@
     if (!Number.isInteger(mi) || !state.modules[mi]) return;
     if (t.dataset.kind === 'dshot-lost') {
       state.modules[mi].dshot.connectionLostAction = Number(t.value);
-      save(); render();
+      save();
+      refreshDerivedViews();
     }
   });
 
