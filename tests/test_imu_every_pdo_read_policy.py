@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TASK_DEFS = (ROOT / "src/soem_wrapper/include/soem_wrapper/task_defs.hpp").read_text()
 HIPNUC_CPP = (ROOT / "src/soem_wrapper/src/tasks/hipnuc_imu_can.cpp").read_text()
-WRAPPER_CPP = (ROOT / "src/soem_wrapper/src/ecat_node.cpp").read_text()
+WRAPPER_CPP = (ROOT / "src/soem_wrapper/src/soem_backend.cpp").read_text()
 
 
 def require(condition: bool, message: str) -> None:
