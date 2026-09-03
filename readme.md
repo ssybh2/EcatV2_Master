@@ -1,152 +1,84 @@
-# EcatV2 Master — 6-IMU Extension
+# EcatV2 Master — ProductCode 0x06：6IMU + DJI RC + DShot
 
-> 基于 `AIMEtherCAT/EcatV2_Master` 的个人 6-IMU 扩展分支。  
-> 目标：`STM32H750 + AX58100 + 2×CAN + 6×HIPNUC HI92 @ 500 Hz`。
+当前真机验证分支：`feature/6imu-rc-dshot-pdo-v006`。
 
-## 🚀 Quick Links
+## 当前 Profile
 
-| 入口 | 链接 |
-| --- | --- |
-| 🌐 6-IMU TaskEditor 在线版 | https://ssybh2.github.io/EcatV2_Master/ |
-| 💻 TaskEditor 源码 | https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo/web/6imu-task-editor |
-| 📘 完整小白部署教程 | [docs/6imu-deployment-beginner-cn.md](docs/6imu-deployment-beginner-cn.md) |
-| 🧪 6-IMU 压力测试（中英双语） | [docs/6imu-500hz-test-plan.md](docs/6imu-500hz-test-plan.md) |
-| ⚙️ Config Generator | [docs/configuration-generator.md](docs/configuration-generator.md) |
-| 🧭 Docs 导航 | [docs/README.md](docs/README.md) |
+| 项目 | 值 |
+|---|---:|
+| ProductCode / eepid | `0x00000006` |
+| M→S application PDO | `80 B` |
+| S→M application PDO | `192 B` |
+| EtherCAT Outputs | `81 B / 648 bit` |
+| EtherCAT Inputs | `193 B / 1544 bit` |
+| task_count | `8` |
+| sdo_len | `91 B` |
 
-## Branches
+S→M：`0..125` 六个 IMU，`126..159` diagnostics，`160..178` DJI RC（18 B DBUS + 1 B online），`179..191` reserved。
 
-| Branch | 用途 |
-| --- | --- |
-| `main` | 保留上游基线，方便对照 |
-| `feature/6imu-large-pdo` | 当前 6-IMU 开发、部署与真机验证分支 |
+M→S：`0..7` DShot（4 × uint16），`8..79` reserved。
 
-`feature/6imu-task-editor` 只是网页开发时留下的 staging branch；网页代码已经完整进入 `feature/6imu-large-pdo/web/6imu-task-editor/`。
+## 真机验证
 
-## 最终 ROS 2 Workspace 结构
-
-本分支继续遵循原仓库 `first-run-test.md` 的 bringup 思路：
+已在 STM32H750 + AX58100 上验证：
 
 ```text
-<workspace>/
-├── src/
-│   ├── EcatV2_Master/
-│   │   ├── src/
-│   │   │   ├── soem_wrapper/
-│   │   │   ├── soem/
-│   │   │   └── custom_msgs/
-│   │   ├── tools/
-│   │   ├── eeproms/
-│   │   └── web/6imu-task-editor/
-│   │
-│   └── soem_bringup/
-│       ├── CMakeLists.txt
-│       ├── package.xml
-│       ├── config/
-│       │   └── config.yaml
-│       └── launch/
-│           └── bringup.launch.py
-│
-├── build/
-├── install/
-└── log/
+Product Code     : 00000006
+Checksum         : 009C
+calculated       : 009C
+Output size      : 648 bits
+Input size       : 1544 bits
+SM2              : 81 B
+SM3              : 193 B
+SAFE_OP          : State 4
+Master           : reached OP
 ```
 
-角色：
+Master 已稳定进入数据循环。6-IMU 已运行；DJI RC / DShot 已完成软件集成，实际遥控器/执行器功能仍应按安全条件分别测试。
+
+## 8-task TaskEditor
+
+- 在线：<https://ssybh2.github.io/EcatV2_Master/>
+- 源码：`web/6imu-task-editor/`
+- 文档：`docs/6imu-task-editor.md`
+
+Editor 现在生成 `0x06 / task_count=8 / sdo_len=91`，包含 Task 7 DJI RC 和 Task 8 DShot。
+
+## 配置
+
+通用模板：
 
 ```text
-soem_wrapper  = EtherCAT Master 程序
-soem_bringup  = 你的配置与启动包
+src/soem_wrapper/config/config_6imu_rc_dshot_template.yaml
 ```
 
-**最终启动命令：**
+创建本机 bringup：
 
 ```bash
-ros2 launch soem_bringup bringup.launch.py
+./tools/prepare_6imu_rc_dshot_bringup.sh <serial> <interface> <rt-cpu> <non-rt-cpus>
 ```
 
-## Target System
+本机 `src/soem_bringup/` 含真实 Serial/NIC/CPU，已加入 `.gitignore`，不要作为公共模板提交。
+
+## EEPROM / SII
+
+当前已验证的 2048-byte AX58100 SII 不含静态 RxPDO / TxPDO category；实际 PDO mapping 与 SM 长度由 H750 上 SOES 的 CoE object dictionary 动态提供。
+
+0x06 镜像由已知可工作的 0x05 EEPROM 复制而来，只修改 SII ProductCode 字段（byte offset `0x14`：`0x05 → 0x06`）。实际写入、读回和断电重启后已验证 ProductCode 0x06、checksum 一致、81 B / 193 B PDO。
+
+详见 `docs/6imu-dji-rc-dshot-deployment-cn.md`。
+
+## Legacy
+
+ProductCode `0x05`（80/160 B、6 个纯 IMU task、sdo_len 85）继续保留为 legacy profile，不要与 0x06 配置混用。
+
+## DShot 安全
+
+首次 DShot 实机验证建议卸下桨叶/脱离负载并准备断电。默认：
 
 ```text
-CAN1 @ 1 Mbps                       CAN2 @ 1 Mbps
-├─ IMU1 Slot1 01/02/03             ├─ IMU4 Slot1 01/02/03
-├─ IMU2 Slot2 04/05/06             ├─ IMU5 Slot2 04/05/06
-└─ IMU3 Slot3 07/08/09             └─ IMU6 Slot3 07/08/09
-              \                     /
-               \                   /
-                STM32H750 + AX58100
-                         │
-                     EtherCAT
-                         │
-                    ROS 2 + SOEM
-                         │
-                 6 × sensor_msgs/Imu
+connection_lost_write_action = 2
+dshot_id = 1
+init_value = 0
+pdowrite_offset = 0
 ```
-
-EtherCAT identity：
-
-```text
-ProductCode = 0x00000005
-Master -> Slave = 80 B
-Slave  -> Master = 160 B
-```
-
-160B Slave→Master：
-
-```text
-0..125    6 × IMU payload
-126..137  6 × sample_seq
-138..149  6 × incomplete_samples
-150..159  CAN FIFO lost/full/read-error diagnostics
-```
-
-## 本分支新增
-
-- 6 个 HIPNUC CAN IMU：CAN1/CAN2 各 3 个。
-- ProductCode `0x05` / 160B Slave→Master PDO。
-- P1→P2→P3 完整组包后才提交 sample。
-- H750 FDCAN RX FIFO 扩容与 FIFO drain。
-- FIFO lost/full/read-error diagnostics。
-- `sample_seq` 去重：只有真正的新 IMU sample 才发布 ROS2 topic。
-- 6-IMU TaskEditor。
-- `flash_6imu_eeprom.sh`：EEPROM 备份/刷写/读回验证。
-- `prepare_6imu_bringup.sh`：自动创建原版风格的 `soem_bringup` package。
-
-## 推荐部署顺序
-
-```text
-Environment Setup
-→ Realtime kernel / CPU isolation
-→ 建 ROS 2 workspace
-→ 烧 3 种 G431 Slot 固件
-→ 烧 H750 固件
-→ CAN / EtherCAT 接线
-→ slaveinfo
-→ 备份并刷 ProductCode 0x05 EEPROM
-→ 自动创建 soem_bringup（先用假 SN）
-→ colcon build
-→ ros2 launch soem_bringup bringup.launch.py
-→ 从日志读取真实 SN
-→ TaskEditor / helper 生成正式 config.yaml
-→ 再次 colcon build
-→ 正式进入 OP
-→ 检查 6 个 ROS2 IMU topic
-→ 1 → 2 → 3 → 3+1 → 3+2 → 3+3 压力测试
-```
-
-完整步骤、命令、成功标准和错误判断：
-
-**[6 个 IMU × 500 Hz EtherCAT 完整部署教程（小白版）](docs/6imu-deployment-beginner-cn.md)**
-
-## Related Firmware
-
-- H750 + AX58100: https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/tree/feature/6imu-large-pdo
-- HIPNUC bridge: https://github.com/ssybh2/hipnucimu/tree/feature/6imu-500hz-stable
-
-## Upstream
-
-所有 6-IMU 修改都只在 `ssybh2` Fork 内。
-
-- https://github.com/AIMEtherCAT/EcatV2_Master
-- https://github.com/AIMEtherCAT/EcatV2_AX58100_H750_Universal
-- https://github.com/AIMEtherCAT/hipnucimu

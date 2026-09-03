@@ -1,186 +1,142 @@
 # ProductCode 0x06：6 IMU + DJI RC + DShot 部署说明
 
-本配置在原 `feature/6imu-large-pdo` 的 ProductCode `0x05` 基础上新增一个兼容 profile，而不是改变 0x05 的含义。
+## 1. Profile
 
-| 项目 | 0x05（保留） | 0x06（新增） |
+| 项目 | 0x05 legacy | 0x06 current |
 |---|---:|---:|
-| Master → Slave application data | 80 B | 80 B |
-| Slave → Master application data | 160 B | 192 B |
-| EtherCAT Outputs（含 status） | 81 B | 81 B |
-| EtherCAT Inputs（含 status） | 161 B | 193 B |
+| M→S application | 80 B | 80 B |
+| S→M application | 160 B | 192 B |
+| EtherCAT Outputs | 81 B | 81 B |
+| EtherCAT Inputs | 161 B | 193 B |
+| task_count | 6 | 8 |
+| sdo_len | 85 B | 91 B |
 
-## 0x06 PDO 布局
+0x06 S→M：6 × 21 B IMU（0..125）+ 34 B diagnostics（126..159）+ 19 B DJI RC（160..178）+ 13 B reserved。
 
-Slave → Master：
+0x06 M→S：DShot 4 × uint16（0..7）+ 72 B reserved。
 
-| Offset | Length | 内容 |
-|---:|---:|---|
-| 0 | 21 | IMU 1 |
-| 21 | 21 | IMU 2 |
-| 42 | 21 | IMU 3 |
-| 63 | 21 | IMU 4 |
-| 84 | 21 | IMU 5 |
-| 105 | 21 | IMU 6 |
-| 126 | 34 | 6-IMU/CAN diagnostics |
-| 160 | 19 | DJI RC/DBUS：18 B 原始帧 + 1 B online |
-| 179 | 13 | reserved |
+## 2. Slave 必须包含的两个实机修复
 
-Master → Slave：
+S→M 为 24 × uint64_t，加上 `slave_status` 后 SM3 共 25 个 mappings，所以：
 
-| Offset | Length | 内容 |
-|---:|---:|---|
-| 0 | 8 | DShot：4 × `uint16_t` |
-| 8 | 72 | reserved |
-
-六个 HIPNUC task 必须排在 DJI RC 前。Slave 在写指针到达 126 B 时立刻插入 34 B diagnostics，这样原 6-IMU/diagnostics offset 全部保持不变。
-
-## 应用源码升级
-
-从升级包目录运行：
-
-```bash
-python3 apply_ecat_v006_upgrade.py \
-  --slave /path/to/EcatV2_AX58100_H750_Universal \
-  --master /path/to/EcatV2_Master
+```c
+#define MAX_MAPPINGS_SM3 25
 ```
 
-默认在两个 repo 中创建 `feature/6imu-rc-dshot-pdo-v006`。运行后：
+旧值 21 会导致 PREOP→SAFEOP 报 `0x001E Invalid input configuration`。
 
-```bash
-git -C /path/to/EcatV2_AX58100_H750_Universal diff --check
-git -C /path/to/EcatV2_Master diff --check
+链接脚本 DMA 区：
+
+```ld
+.dma_buffer (NOLOAD) :
 ```
 
-## EEPROM：不要跳过重新生成
+否则 RAM_D2 DMA 区会进入裸 `.bin`，导致 binary 异常膨胀。
 
-`ecat/device/patch_esi.py` 是 post-process 脚本，不是 ESI/SII compiler。必须使用该从站项目原本的 EtherCAT SDK / ESX code generator，根据更新后的 `slave.esx` 重新生成真正的 `slave.bin`。
+## 3. EEPROM / SII：真机验证后的正确方法
 
-推荐流程：
+当前已知可工作的 2048-byte AX58100 SII EEPROM **没有静态 RxPDO / TxPDO category**。实际 PDO mapping 与 SM2/SM3 长度由 H750 上 SOES object dictionary / CoE 动态提供。
+
+因此 0x06 镜像采用：
+
+1. 备份已知可工作的 ProductCode `0x05` EEPROM。
+2. 复制为新镜像。
+3. 只修改 SII ProductCode byte offset `0x14`：`0x05 → 0x06`。
+4. 验证两个 2048-byte 镜像只差这一字节。
+5. 用 `eepromtool` 写入、读回并逐字节比较。
+6. 整块 H750 + AX58100 完全断电再上电。
+
+不要用旧 ProductCode `0x03` 的 `slave.bin` 作为 0x06 烧写基线，也不要为了 0x06 强行添加当前已验证 SII 中不存在的静态 PDO category。
+
+Master 中最终镜像：
 
 ```text
-更新后的 slave.esx
-  -> EtherCAT SDK / ESX generator
-  -> 新的 slave.bin / generated ESI
-  -> 检查 ProductCode=0x06、0x6001/0x1A01 共 24 项
-  -> python3 ecat/device/patch_esi.py
-  -> eeprom.bin
+eeproms/58100H750_UniversalModule_6IMU_RC_DSHOT.bin
 ```
 
-注意 generator 可能覆盖 `slave_objectlist.c` / `utypes.h`。生成后必须再次确认：
-
-```text
-slave2master[24]
-ProductCode 0x06
-0x1A01 MaxSubIndex = 24
-0x6001 MaxSubIndex = 24
-SLAVE_TO_MASTER_PDO_SIZE = 192
-```
-
-验证新二进制：
+检查：
 
 ```bash
 python3 - <<'PY'
 from pathlib import Path
 import struct
-b = Path("ecat/device/eeprom.bin").read_bytes()
+b = Path('eeproms/58100H750_UniversalModule_6IMU_RC_DSHOT.bin').read_bytes()
 assert len(b) == 2048
-assert struct.unpack_from("<I", b, 0x14)[0] == 0x06
-assert b"6IMU_RC_DSHOT" in b
-print("EEPROM basic validation OK")
+assert struct.unpack_from('<I', b, 0x14)[0] == 6
+print('EEPROM OK: ProductCode 0x06, 2048 bytes')
 PY
 ```
 
-然后复制到 Master：
+烧写：
 
 ```bash
-cp ecat/device/eeprom.bin \
-  /path/to/EcatV2_Master/eeproms/58100H750_UniversalModule_6IMU_RC_DSHOT.bin
+sudo ./tools/eepromtool enp1s0 1 -i
+sudo ./tools/slaveinfo enp1s0
+./tools/flash_6imu_rc_dshot_eeprom.sh enp1s0 1
 ```
 
-## Master 配置
-
-Master 注册新模块：
-
-```cpp
-register_module(6, "H750UniversalModule (6-IMU + RC + DSHOT)", 80, 192, 8);
-```
-
-新配置：
-
-```yaml
-sdo_len: !uint16_t 91
-task_count: !uint8_t 8
-```
-
-DJI RC：
-
-```yaml
-sdowrite_task_type: !uint8_t 1
-pdoread_offset: !uint16_t 160
-pub_topic: !std::string '/dji_rc'
-```
-
-DShot：
-
-```yaml
-sdowrite_task_type: !uint8_t 4
-sdowrite_connection_lost_write_action: !uint8_t 2
-sdowrite_dshot_id: !uint8_t 1
-sdowrite_init_value: !uint16_t 0
-pdowrite_offset: !uint16_t 0
-sub_topic: !std::string '/dshot'
-```
-
-SDO 长度：`1 + 6*14 + 1 + 5 = 91 B`。
-
-生成 bringup：
-
-```bash
-tools/prepare_6imu_rc_dshot_bringup.sh \
-  <slave-serial> <ethercat-interface> <rt-cpu> <non-rt-cpus>
-```
-
-烧 EEPROM：
-
-```bash
-tools/flash_6imu_rc_dshot_eeprom.sh <interface> <slave-number>
-```
-
-## 真机验收
-
-断电重启从站后，应确认：
+烧写后整板断电重启。真机已验证：
 
 ```text
-Product Code = 0x00000006
-Outputs = 81 bytes
-Inputs  = 193 bytes
+Product Code     : 00000006
+Checksum         : 009C
+calculated       : 009C
+Output size      : 648bits
+Input size       : 1544bits
+State            : 4
+SM2              : 81 B
+SM3              : 193 B
 ```
 
-ROS 2：
+EEPROM String category 仍可能显示旧的 `58100_H750_UniversalModule_6IMU_PDO` 名称，这是预期；0x06 区分依据为 ProductCode / ID。
+
+## 4. Master 8-task 配置
+
+```text
+Task 1..6 HIPNUC IMU read @ 0,21,42,63,84,105
+Task 7    DJI RC      read @ 160
+Task 8    DShot       write @ 0
+sdo_len = 91
+task_count = 8
+```
+
+DShot 推荐安全默认值：
+
+```text
+connection_lost_write_action = 2
+dshot_id = 1
+init_value = 0
+```
+
+通用模板：`src/soem_wrapper/config/config_6imu_rc_dshot_template.yaml`
+
+在线 Editor：<https://ssybh2.github.io/EcatV2_Master/>
+
+## 5. 本机 bringup
+
+真实 Serial/NIC/CPU 属于机器本地配置，不提交到公共模板：
 
 ```bash
-ros2 topic echo /dji_rc
-ros2 topic info /dshot
+./tools/prepare_6imu_rc_dshot_bringup.sh <serial> <interface> <rt-cpu> <non-rt-cpus>
+source /opt/ros/humble/setup.bash
+colcon build
+source install/setup.bash
 ```
 
-DShot 第一次测试请拆桨或确保机械系统没有运动风险，保持 `init_value=0`，先验证 EtherCAT OP、topic、PDO 和断线归零，再发非零值。
+启动前用 `ros2 pkg prefix soem_wrapper` / `soem_bringup` 确认没有误加载旧 workspace。
 
-## Git 提交
+## 6. Git
 
-Slave：
+不要未经检查就 `git add -A`。推荐：
 
 ```bash
-git add -A
-git commit -m "feat: add ProductCode 0x06 192B PDO profile with RC and DShot"
-git push -u origin feature/6imu-rc-dshot-pdo-v006
+git status --short
+git diff --check
+git add <明确的通用文件>
+git diff --cached --stat
+git diff --cached --check
+git commit ...
+git push
 ```
 
-Master：
-
-```bash
-git add -A
-git commit -m "feat: add ProductCode 0x06 6IMU RC DShot bringup"
-git push -u origin feature/6imu-rc-dshot-pdo-v006
-```
-
-真机完整验证前建议不要 merge 到 `main`。
+`src/soem_bringup/`、EEPROM backup/readback、build/install/log 均保持本地。

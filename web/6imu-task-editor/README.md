@@ -1,42 +1,33 @@
-# 6-IMU EtherCAT TaskEditor
+# ProductCode 0x06 TaskEditor
 
-A small static configuration generator dedicated to the custom `ProductCode 0x05` H750 + AX58100 slave used by this branch.
+目标 profile：
 
-## Why this editor exists
+- ProductCode/eepid `0x06`
+- application PDO：M→S `80 B`，S→M `192 B`
+- EtherCAT process data：Outputs `81 B`，Inputs `193 B`
+- `task_count = 8`
+- `sdo_len = 91`
 
-The upstream AIMEtherCAT TaskEditor currently knows the standard H750 module (`0x03`) and the 112-byte Large PDO module (`0x04`). Our six-IMU slave uses:
+固定 task 顺序：
 
-- ProductCode/eepid `0x05`
-- Master -> Slave PDO: 80 bytes
-- Slave -> Master PDO: 160 bytes
-- Six fixed HIPNUC CAN IMU tasks, 21 bytes each
-- A fixed 34-byte diagnostic tail at bytes 126..159
+1. HIPNUC IMU 1，read @ 0
+2. HIPNUC IMU 2，read @ 21
+3. HIPNUC IMU 3，read @ 42
+4. HIPNUC IMU 4，read @ 63
+5. HIPNUC IMU 5，read @ 84
+6. HIPNUC IMU 6，read @ 105
+7. DJI RC / DBUS，read @ 160，19 B
+8. DShot，write @ 0，8 B（4 × uint16）
 
-The upstream HIPNUC task field format remains compatible, but its old board-size check cannot represent this 160-byte profile.
+网页可编辑 Serial、6 个 IMU 的 CAN ID/topic/frame、DJI RC topic，以及 DShot topic、ID、init value、connection-lost action。Task 类型与 PDO offset 按 0x06 profile 固定。
 
-## What this page generates
-
-The page generates the ROS2/SOEM `config.yaml` only. It does **not** program the AX58100 EEPROM. ProductCode `0x05` comes from the EEPROM image and Master module registration.
-
-The generated module contains:
-
-- `sdo_len: !uint16_t 85`
-- `task_count: !uint8_t 6`
-- six `HIPNUC_IMU_CAN` tasks (`sdowrite_task_type = 3`)
-- fixed CAN1/CAN2 placement
-- fixed PDO read offsets: `0, 21, 42, 63, 84, 105`
-- editable CAN packet IDs, ROS2 topics and frame names
-
-## Local use
-
-This implementation has no npm dependency. Open `index.html` in a browser, or serve this folder with any static HTTP server.
-
-## Test
+本地验证：
 
 ```bash
+node --check generator.js
+node --check app.js
+node --check test-generator.js
 node test-generator.js
 ```
 
-## Credits
-
-The interaction concept is inspired by the MIT-licensed [AIMEtherCAT/TaskEditor](https://github.com/AIMEtherCAT/TaskEditor). This ProductCode `0x05` implementation is written as a separate static editor for the `ssybh2/EcatV2_Master` fork and does not modify the upstream project.
+GitHub Pages 由 `.github/workflows/pages-6imu-task-editor.yml` 从 `feature/6imu-rc-dshot-pdo-v006` 部署。

@@ -6,7 +6,7 @@ BACKUP_DIR="$ROOT_DIR/.local_6imu_rc_dshot_backups"
 
 if [[ $# -ne 4 ]]; then
   echo "Usage: $0 <slave-serial> <ethercat-interface> <rt-cpu> <non-rt-cpus>"
-  echo "Example: $0 2883658 enx000ec6c1d02b 1 0,2-15"
+  echo "Example: $0 1234567 enp1s0 7 0,1,2,3,4,5,6"
   exit 2
 fi
 

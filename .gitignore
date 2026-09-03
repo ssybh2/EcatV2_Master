@@ -7,4 +7,9 @@ log/
 eeprom_backups/
 .local_6imu_backups/
 
-.idea/
+.idea/.local_6imu_rc_dshot_backups/
+/src/soem_bringup/config/config.yaml
+/src/soem_bringup/launch/bringup.launch.py
+.local_6imu_rc_dshot_backups/
+/src/soem_bringup/
+*.readback.bin

@@ -14,7 +14,7 @@ IFACE="$1"; SLAVE="$2"
 [[ -x "$TOOL" ]] || { echo "ERROR: missing eepromtool: $TOOL" >&2; exit 1; }
 [[ -f "$IMAGE" ]] || {
   echo "ERROR: missing NEW 0x06 image: $IMAGE" >&2
-  echo "Do not rename/reuse the old 0x05 image." >&2
+  echo "Use the validated 0x06 image; keep the original 0x05 EEPROM as a separate backup." >&2
   exit 1
 }
 

@@ -1,101 +1,31 @@
-# EcatV2 Master 教程导航
+# Documentation
 
-如果你第一次部署这套 EtherCAT 系统，建议按照下面顺序，不要跳步骤。
+## 当前推荐：ProductCode 0x06
 
-## 原版基础路线
+`feature/6imu-rc-dshot-pdo-v006` 支持：
 
-1. [Environment Setup](environment-setup.md)  
-   BIOS、Ubuntu/ROS 2、Realtime kernel、CPU isolation、workspace、EEPROM/MCU。
+- 6 × HIPNUC IMU
+- DJI RC / DBUS read
+- DShot write
+- application PDO `80 B M→S / 192 B S→M`
+- EtherCAT `81 B Outputs / 193 B Inputs`
+- `task_count=8`
+- `sdo_len=91`
 
-2. [First Run Test](first-run-test.md)  
-   创建 `soem_bringup`、config、launch、第一次启动、从日志读取真实 Slave SN。
+入口：
 
-3. [Configuration Generator](configuration-generator.md)  
-   使用原版 TaskEditor 或我们的 6-IMU TaskEditor 生成 `config.yaml`，放进 `soem_bringup/config/`。
+- [`6imu-dji-rc-dshot-deployment-cn.md`](6imu-dji-rc-dshot-deployment-cn.md)
+- [`6imu-task-editor.md`](6imu-task-editor.md)
+- [`../src/soem_wrapper/config/config_6imu_rc_dshot_template.yaml`](../src/soem_wrapper/config/config_6imu_rc_dshot_template.yaml)
+- [`../tools/prepare_6imu_rc_dshot_bringup.sh`](../tools/prepare_6imu_rc_dshot_bringup.sh)
+- [`../tools/flash_6imu_rc_dshot_eeprom.sh`](../tools/flash_6imu_rc_dshot_eeprom.sh)
 
-原仓库最终启动方式：
+在线 TaskEditor：<https://ssybh2.github.io/EcatV2_Master/>
 
-```bash
-ros2 launch soem_bringup bringup.launch.py
-```
+## Legacy：ProductCode 0x05
 
----
+旧 `feature/6imu-large-pdo` 内容对应 `0x05 / 80 B / 160 B / task_count 6 / sdo_len 85`，仅用于 legacy profile。
 
+## 真机基线
 
-## ProductCode 0x06：6-IMU + DJI RC + DShot
-
-[完整部署说明](6imu-dji-rc-dshot-deployment-cn.md)
-
-该配置保留 ProductCode `0x05` 的 80/160 B profile，并新增
-ProductCode `0x06`：Master→Slave 80 B、Slave→Master 192 B。
-
----
-
-# 6-IMU / 500 Hz 专用入口
-
-## 推荐：第一次部署直接看这一篇
-
-[6 个 IMU × 500 Hz EtherCAT 完整部署教程（小白版）](6imu-deployment-beginner-cn.md)
-
-它已经把：
-
-```text
-Environment Setup
-+
-First Run Test
-+
-Generate Config File
-+
-G431 / H750 烧录
-+
-ProductCode 0x05 EEPROM
-+
-6-IMU TaskEditor
-+
-soem_bringup
-+
-500 Hz 验证
-+
-中文压力测试
-```
-
-全部合并成一条完整路线。
-
-## 6-IMU TaskEditor
-
-在线：
-
-https://ssybh2.github.io/EcatV2_Master/
-
-源码：
-
-https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo/web/6imu-task-editor
-
-说明：
-
-[6-IMU TaskEditor 使用说明](6imu-task-editor.md)
-
-## 压力测试
-
-[6-IMU / 500 Hz 压力测试计划（中英双语）](6imu-500hz-test-plan.md)
-
-## 简版 Bringup
-
-[6-IMU Bringup Guide](6imu-bringup.md)
-
----
-
-# 当前实验分支
-
-```text
-ssybh2/EcatV2_Master
-└── feature/6imu-large-pdo
-
-ssybh2/EcatV2_AX58100_H750_Universal
-└── feature/6imu-large-pdo
-
-ssybh2/hipnucimu
-└── feature/6imu-500hz-stable
-```
-
-真机完整验证通过前，不要把实验分支合并进 `main`。
+0x06 已验证 ProductCode `0x06`、SAFE_OP State 4、SM2 `81 B`、SM3 `193 B`，Master 能进入 OP。
