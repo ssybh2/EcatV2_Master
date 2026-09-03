@@ -121,6 +121,8 @@ namespace aim::ecat {
 
         bool all_slave_ready = false;
         rclcpp::Time current_time{};
+        bool raw_pdo_observation_initialized = false;
+        auto last_raw_pdo_observation = std::chrono::steady_clock::now();
 
         // all settings updated, mark data cycle as operational
         in_operational_ = true;
@@ -128,6 +130,28 @@ namespace aim::ecat {
         while (running_) {
             // recv ecat frame
             wkc_ = ec_receive_processdata(100);
+
+            // A 500 Hz IMU commits a new sample about every 2 ms. If the host
+            // goes longer than that between raw PDO observations, it can skip an
+            // intermediate sequence value even though the slave committed it.
+            // Use steady_clock so wall/ROS clock adjustments cannot fake a gap.
+            const auto raw_pdo_observation = std::chrono::steady_clock::now();
+            if (raw_pdo_observation_initialized) {
+                const auto raw_pdo_gap_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                    raw_pdo_observation - last_raw_pdo_observation).count();
+                if (raw_pdo_gap_us > 2000) {
+                    RCLCPP_WARN_THROTTLE(
+                        *logging::get_health_checker_logger(),
+                        *get_clock(),
+                        1000,
+                        "RAW PDO GAP: %.3f ms between ec_receive_processdata returns; wkc=%d expected=%d",
+                        static_cast<double>(raw_pdo_gap_us) / 1000.0,
+                        wkc_.load(),
+                        expectedWkc_);
+                }
+            }
+            last_raw_pdo_observation = raw_pdo_observation;
+            raw_pdo_observation_initialized = true;
 
             // transfer data from ecat stack into buffer managed by ourselves
             for (const auto &slave: get_slave_devices()) {
