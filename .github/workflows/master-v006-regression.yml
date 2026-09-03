@@ -6,16 +6,46 @@ on:
       - "feature/6imu-rc-dshot-pdo-v006"
     paths:
       - "src/soem_wrapper/**"
+      - "src/custom_msgs/**"
+      - "src/soem/**"
       - "tests/test_imu_every_pdo_read_policy.py"
       - ".github/workflows/master-v006-regression.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   regression:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
       - name: Verify 6-IMU every-PDO read contract
         run: python3 tests/test_imu_every_pdo_read_policy.py
+
+      - name: Setup ROS 2 Humble
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: humble
+
+      - name: Install workspace dependencies
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          sudo apt-get update
+          sudo apt-get install -y python3-colcon-common-extensions python3-rosdep
+          rosdep update
+          rosdep install --from-paths src --ignore-src --rosdistro humble -r -y
+
+      - name: Build soem_wrapper and workspace dependencies
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build \
+            --packages-up-to soem_wrapper \
+            --event-handlers console_direct+ \
+            --cmake-args -DCMAKE_BUILD_TYPE=Release
