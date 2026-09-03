@@ -19,7 +19,7 @@ This fork contains a dedicated experimental branch for a **STM32H750 + AX58100 +
 | 🌐 Online 6-IMU TaskEditor | https://ssybh2.github.io/EcatV2_Master/ |
 | 💻 TaskEditor source | https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo/web/6imu-task-editor |
 | 🧩 6-IMU development branch | https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo |
-| 📘 Beginner deployment guide | https://github.com/ssybh2/EcatV2_Master/blob/feature/6imu-large-pdo/docs/6imu-deployment-beginner-cn.md |
+| 📘 Beginner deployment guide | https://github.com/ssybh2/EcatV2_Master/blob/feature/6imu-rc-dshot-pdo-v006/docs/6imu-deployment-beginner-cn.md |
 | 🧭 6-IMU documentation index | https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-large-pdo/docs |
 
 For the 6-IMU system, start with the **Beginner deployment guide** above instead of following `main` directly.
