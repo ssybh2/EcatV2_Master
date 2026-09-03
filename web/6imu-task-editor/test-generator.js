@@ -1,5 +1,7 @@
 'use strict';
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const C = require('./generator.js');
 
 const m = C.createDefaultModule('2883658');
@@ -31,4 +33,21 @@ const yaml = C.generateConfigYaml([m]);
   "sub_topic: !std::string '/dshot'",
 ].forEach(x => assert(yaml.includes(x), `missing: ${x}`));
 
-console.log('ProductCode 0x06 TaskEditor generator tests: PASS');
+// UI regression: typing in editable fields must not rebuild moduleList.
+// Rebuilding moduleList on every input destroys the focused <input>, so users
+// cannot continuously delete/type SN, topics, frame names, or CAN IDs.
+const appSource = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+const inputHandlerStart = appSource.indexOf("moduleList.addEventListener('input'");
+const changeHandlerStart = appSource.indexOf("moduleList.addEventListener('change'", inputHandlerStart);
+assert(inputHandlerStart >= 0 && changeHandlerStart > inputHandlerStart, 'input handler not found');
+const inputHandler = appSource.slice(inputHandlerStart, changeHandlerStart);
+assert(
+  inputHandler.includes('refreshDerivedViews('),
+  'editable input handler must refresh derived views without rebuilding module DOM'
+);
+assert(
+  !inputHandler.includes('render();'),
+  'editable input handler must not call full render(), which destroys input focus/caret'
+);
+
+console.log('ProductCode 0x06 TaskEditor generator + input regression tests: PASS');
