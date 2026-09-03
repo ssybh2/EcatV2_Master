@@ -21,6 +21,16 @@ ros2 launch soem_bringup bringup.launch.py
 
 ---
 
+
+## ProductCode 0x06：6-IMU + DJI RC + DShot
+
+[完整部署说明](6imu-dji-rc-dshot-deployment-cn.md)
+
+该配置保留 ProductCode `0x05` 的 80/160 B profile，并新增
+ProductCode `0x06`：Master→Slave 80 B、Slave→Master 192 B。
+
+---
+
 # 6-IMU / 500 Hz 专用入口
 
 ## 推荐：第一次部署直接看这一篇

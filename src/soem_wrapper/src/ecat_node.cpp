@@ -433,6 +433,7 @@ namespace aim::ecat {
         register_module(3, "H750UniversalModule", 80, 80, 8);
         register_module(4, "H750UniversalModule (Large PDO V.)", 80, 112, 8);
         register_module(5, "H750UniversalModule (6-IMU Large PDO V.)", 80, 160, 8);
+        register_module(6, "H750UniversalModule (6-IMU + RC + DSHOT)", 80, 192, 8);
     }
 
     void EthercatNode::register_module(const uint32_t eep_id,
