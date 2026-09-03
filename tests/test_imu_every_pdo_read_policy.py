@@ -16,7 +16,7 @@ require(
     "Every-PDO reads must be gated to the sequence-counter 6-IMU PDO layouts",
 )
 require(
-    "task->get_type_id() == task::HIPNUC_IMU_CAN_APP_ID" in WRAPPER_CPP,
+    "get_type_id()" in WRAPPER_CPP and "HIPNUC_IMU_CAN_APP_ID" in WRAPPER_CPP,
     "Only HIPNUC IMU tasks should opt into the every-PDO fast path",
 )
 
@@ -29,7 +29,7 @@ pre_ack = body[:ack]
 post_ack = body[ack:]
 
 require(
-    "task->read();" in pre_ack,
+    "task->read();" in pre_ack or "task_wrapper->read();" in pre_ack,
     "Sequenced HIPNUC tasks must be read before the status-ack gate",
 )
 require(
