@@ -5,8 +5,11 @@
 #ifndef ETHERCAT_NODE_HPP
 #define ETHERCAT_NODE_HPP
 
-#include "chrono"
-#include "thread"
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <thread>
+
 #include "rclcpp/rclcpp.hpp"
 
 #ifndef GIT_HASH
@@ -56,6 +59,18 @@ namespace aim::ecat {
         }
 
     private:
+        struct LoopStallSnapshot {
+            std::atomic<int64_t> scheduler_gap_us{0};
+            std::atomic<int64_t> receive_us{0};
+            std::atomic<int64_t> copy_in_us{0};
+            std::atomic<int64_t> process_pdo_us{0};
+            std::atomic<int64_t> copy_out_us{0};
+            std::atomic<int64_t> send_us{0};
+            std::atomic<int64_t> cycle_us{0};
+            std::atomic<int64_t> raw_pdo_gap_us{0};
+            std::atomic<int> observed_wkc{0};
+        };
+
         void register_components();
 
         void register_module(uint32_t eep_id,
@@ -68,12 +83,26 @@ namespace aim::ecat {
 
         void state_check_callback();
 
+        void record_loop_stall_snapshot(int64_t scheduler_gap_us,
+                                        int64_t receive_us,
+                                        int64_t copy_in_us,
+                                        int64_t process_pdo_us,
+                                        int64_t copy_out_us,
+                                        int64_t send_us,
+                                        int64_t cycle_us,
+                                        int64_t raw_pdo_gap_us,
+                                        int observed_wkc);
+
+        void report_loop_stall_snapshot(uint64_t &last_reported_generation);
+
         char IOmap_[4096]{};
 
         std::string interface_{};
         int rt_cpu_{};
         std::string non_rt_cpus_{};
         std::string config_file_{};
+        int64_t sequenced_imu_period_us_{3000};
+        int64_t loop_stall_profile_threshold_us_{5000};
 
         // m2s, s2m
         std::unordered_map<uint32_t, std::pair<uint16_t, uint16_t> > registered_module_buf_lens{};
@@ -90,6 +119,12 @@ namespace aim::ecat {
         int expectedWkc_{};
         std::atomic<int> wkc_{};
         std::atomic<bool> in_operational_{};
+
+        // Single-writer (realtime data thread) / single-reader (checker thread)
+        // seqlock-style handoff. Odd generation means a snapshot is being written;
+        // even generation means all atomic fields belong to one committed snapshot.
+        std::atomic<uint64_t> loop_stall_generation_{0};
+        LoopStallSnapshot loop_stall_snapshot_{};
     };
 
     std::shared_ptr<EthercatNode> get_node();

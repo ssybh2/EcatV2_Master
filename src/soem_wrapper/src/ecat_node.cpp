@@ -44,6 +44,30 @@ namespace aim::ecat {
         non_rt_cpus_ = this->get_parameter("non_rt_cpus").as_string();
         RCLCPP_INFO(*logging::get_sys_logger(), "Using non_rt_cpus: %s", non_rt_cpus_.c_str());
 
+        this->declare_parameter<int>("sequenced_imu_period_us", 3000);
+        sequenced_imu_period_us_ = this->get_parameter("sequenced_imu_period_us").as_int();
+        if (sequenced_imu_period_us_ <= 0) {
+            RCLCPP_WARN(*logging::get_sys_logger(),
+                        "Invalid sequenced_imu_period_us=%lld, using 3000 us",
+                        static_cast<long long>(sequenced_imu_period_us_));
+            sequenced_imu_period_us_ = 3000;
+        }
+        RCLCPP_INFO(*logging::get_sys_logger(),
+                    "Using sequenced IMU sample period: %lld us",
+                    static_cast<long long>(sequenced_imu_period_us_));
+
+        this->declare_parameter<int>("loop_stall_profile_threshold_us", 5000);
+        loop_stall_profile_threshold_us_ = this->get_parameter("loop_stall_profile_threshold_us").as_int();
+        if (loop_stall_profile_threshold_us_ <= 0) {
+            RCLCPP_WARN(*logging::get_sys_logger(),
+                        "Invalid loop_stall_profile_threshold_us=%lld, using 5000 us",
+                        static_cast<long long>(loop_stall_profile_threshold_us_));
+            loop_stall_profile_threshold_us_ = 5000;
+        }
+        RCLCPP_INFO(*logging::get_sys_logger(),
+                    "Using EtherCAT loop stall profiler threshold: %lld us",
+                    static_cast<long long>(loop_stall_profile_threshold_us_));
+
         this->declare_parameter<std::string>(
             "config_file", "/home/hang/ecat_ws/src/soem_wrapper/config/config.yaml");
         config_file_ = this->get_parameter("config_file").as_string();
@@ -85,6 +109,36 @@ namespace aim::ecat {
         ec_close();
     }
 
+    void EthercatNode::record_loop_stall_snapshot(const int64_t scheduler_gap_us,
+                                                   const int64_t receive_us,
+                                                   const int64_t copy_in_us,
+                                                   const int64_t process_pdo_us,
+                                                   const int64_t copy_out_us,
+                                                   const int64_t send_us,
+                                                   const int64_t cycle_us,
+                                                   const int64_t raw_pdo_gap_us,
+                                                   const int observed_wkc) {
+        // The realtime thread is the only writer. Publish an odd generation while
+        // updating and an even generation once every atomic field is committed.
+        // Snapshot writes only happen on an anomalous gap, so seq_cst atomics here
+        // avoid a mutex without adding cost to normal EtherCAT cycles.
+        const uint64_t current_generation = loop_stall_generation_.load();
+        const uint64_t write_generation = (current_generation & ~uint64_t{1}) + 1U;
+        loop_stall_generation_.store(write_generation);
+
+        loop_stall_snapshot_.scheduler_gap_us.store(scheduler_gap_us);
+        loop_stall_snapshot_.receive_us.store(receive_us);
+        loop_stall_snapshot_.copy_in_us.store(copy_in_us);
+        loop_stall_snapshot_.process_pdo_us.store(process_pdo_us);
+        loop_stall_snapshot_.copy_out_us.store(copy_out_us);
+        loop_stall_snapshot_.send_us.store(send_us);
+        loop_stall_snapshot_.cycle_us.store(cycle_us);
+        loop_stall_snapshot_.raw_pdo_gap_us.store(raw_pdo_gap_us);
+        loop_stall_snapshot_.observed_wkc.store(observed_wkc);
+
+        loop_stall_generation_.store(write_generation + 1U);
+    }
+
     void EthercatNode::datacycle_callback() {
         // set soem_wrapper cpu affinity
         const pthread_t thread_id = pthread_self();
@@ -124,40 +178,70 @@ namespace aim::ecat {
         bool raw_pdo_observation_initialized = false;
         auto last_raw_pdo_observation = std::chrono::steady_clock::now();
 
+        // To explain a receive-to-receive gap, keep the stage durations that
+        // happened after the previous receive. On the next receive these values,
+        // plus scheduler_gap_us and receive_us, partition the observed raw PDO gap.
+        bool previous_cycle_timing_initialized = false;
+        int64_t previous_copy_in_us = 0;
+        int64_t previous_process_pdo_us = 0;
+        int64_t previous_copy_out_us = 0;
+        int64_t previous_send_us = 0;
+        auto previous_send_end = std::chrono::steady_clock::now();
+
+        const auto to_us = [](const auto duration) -> int64_t {
+            return std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+        };
+
         // all settings updated, mark data cycle as operational
         in_operational_ = true;
 
         while (running_) {
-            // recv ecat frame
-            wkc_ = ec_receive_processdata(100);
+            const auto loop_entry = std::chrono::steady_clock::now();
+            const int64_t scheduler_gap_us = previous_cycle_timing_initialized
+                                                 ? to_us(loop_entry - previous_send_end)
+                                                 : 0;
 
-            // A 500 Hz IMU commits a new sample about every 2 ms. If the host
-            // goes longer than that between raw PDO observations, it can skip an
-            // intermediate sequence value even though the slave committed it.
-            // Use steady_clock so wall/ROS clock adjustments cannot fake a gap.
+            // recv ecat frame
+            const auto receive_start = loop_entry;
+            wkc_ = ec_receive_processdata(100);
             const auto raw_pdo_observation = std::chrono::steady_clock::now();
+            const int64_t receive_us = to_us(raw_pdo_observation - receive_start);
+
+            // ProductCode 0x06 currently forwards sequenced IMU samples every
+            // 3 ms (~333 Hz). Keep that period configurable so a 500 Hz setup can
+            // select 2000 us without changing source code. No ROS logging is done
+            // here: anomalous timing is handed to the non-realtime checker thread.
+            int64_t raw_pdo_gap_us = 0;
             if (raw_pdo_observation_initialized) {
-                const auto raw_pdo_gap_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                    raw_pdo_observation - last_raw_pdo_observation).count();
-                if (raw_pdo_gap_us > 2000) {
-                    RCLCPP_WARN_THROTTLE(
-                        *logging::get_health_checker_logger(),
-                        *get_clock(),
-                        1000,
-                        "RAW PDO GAP: %.3f ms between ec_receive_processdata returns; wkc=%d expected=%d",
-                        static_cast<double>(raw_pdo_gap_us) / 1000.0,
-                        wkc_.load(),
-                        expectedWkc_);
+                raw_pdo_gap_us = to_us(raw_pdo_observation - last_raw_pdo_observation);
+
+                const bool sample_risk = raw_pdo_gap_us >= sequenced_imu_period_us_;
+                const bool detailed_stall = raw_pdo_gap_us >= loop_stall_profile_threshold_us_;
+                if (previous_cycle_timing_initialized && (sample_risk || detailed_stall)) {
+                    record_loop_stall_snapshot(
+                        scheduler_gap_us,
+                        receive_us,
+                        previous_copy_in_us,
+                        previous_process_pdo_us,
+                        previous_copy_out_us,
+                        previous_send_us,
+                        raw_pdo_gap_us,
+                        raw_pdo_gap_us,
+                        wkc_.load());
                 }
             }
             last_raw_pdo_observation = raw_pdo_observation;
             raw_pdo_observation_initialized = true;
 
             // transfer data from ecat stack into buffer managed by ourselves
+            const auto copy_in_start = raw_pdo_observation;
             for (const auto &slave: get_slave_devices()) {
                 std::lock_guard lock(slave->mtx_);
                 slave->receive_from_slave();
             }
+            const auto copy_in_end = std::chrono::steady_clock::now();
+
+            const auto process_pdo_start = copy_in_end;
 
             // check if all slaves are all ready
             if (!all_slave_ready) {
@@ -253,15 +337,27 @@ namespace aim::ecat {
                 }
                 exiting_reset_called_ = true;
             }
+            const auto process_pdo_end = std::chrono::steady_clock::now();
 
             // transfer pdo data from buffer managed by ourselves info ecat stack
+            const auto copy_out_start = process_pdo_end;
             for (const auto &slave: get_slave_devices()) {
                 std::lock_guard lock(slave->mtx_);
                 slave->transfer_to_slave();
             }
+            const auto copy_out_end = std::chrono::steady_clock::now();
 
             // send ecat frame
+            const auto send_start = copy_out_end;
             ec_send_processdata();
+            const auto send_end = std::chrono::steady_clock::now();
+
+            previous_copy_in_us = to_us(copy_in_end - copy_in_start);
+            previous_process_pdo_us = to_us(process_pdo_end - process_pdo_start);
+            previous_copy_out_us = to_us(copy_out_end - copy_out_start);
+            previous_send_us = to_us(send_end - send_start);
+            previous_send_end = send_end;
+            previous_cycle_timing_initialized = true;
         }
 
         // destroy all publisher and subscriber
@@ -276,8 +372,11 @@ namespace aim::ecat {
         // pre-define var outside the loop
         // to save time and improve perf
         int slave_idx{};
+        uint64_t last_reported_loop_stall_generation = 0;
 
         while (running_ && rclcpp::ok()) {
+            report_loop_stall_snapshot(last_reported_loop_stall_generation);
+
             if (in_operational_ && (wkc_ < expectedWkc_ || ec_group[0].docheckstate)) {
                 RCLCPP_WARN_THROTTLE(*logging::get_health_checker_logger(),
                                      *get_clock(),
@@ -377,6 +476,65 @@ namespace aim::ecat {
                 }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
+
+    void EthercatNode::report_loop_stall_snapshot(uint64_t &last_reported_generation) {
+        const uint64_t generation_before = loop_stall_generation_.load();
+        if (generation_before == 0U ||
+            (generation_before & 1U) != 0U ||
+            generation_before == last_reported_generation) {
+            return;
+        }
+
+        const int64_t scheduler_gap_us = loop_stall_snapshot_.scheduler_gap_us.load();
+        const int64_t receive_us = loop_stall_snapshot_.receive_us.load();
+        const int64_t copy_in_us = loop_stall_snapshot_.copy_in_us.load();
+        const int64_t process_pdo_us = loop_stall_snapshot_.process_pdo_us.load();
+        const int64_t copy_out_us = loop_stall_snapshot_.copy_out_us.load();
+        const int64_t send_us = loop_stall_snapshot_.send_us.load();
+        const int64_t cycle_us = loop_stall_snapshot_.cycle_us.load();
+        const int64_t raw_pdo_gap_us = loop_stall_snapshot_.raw_pdo_gap_us.load();
+        const int observed_wkc = loop_stall_snapshot_.observed_wkc.load();
+
+        const uint64_t generation_after = loop_stall_generation_.load();
+        if (generation_before != generation_after || (generation_after & 1U) != 0U) {
+            return;
+        }
+        last_reported_generation = generation_after;
+
+        if (raw_pdo_gap_us >= sequenced_imu_period_us_) {
+            RCLCPP_WARN_THROTTLE(
+                *logging::get_health_checker_logger(),
+                *get_clock(),
+                1000,
+                "RAW PDO GAP: %.3f ms between ec_receive_processdata returns; wkc=%d expected=%d",
+                static_cast<double>(raw_pdo_gap_us) / 1000.0,
+                observed_wkc,
+                expectedWkc_);
+        }
+
+        if (cycle_us >= loop_stall_profile_threshold_us_) {
+            const int64_t accounted_us = scheduler_gap_us + receive_us + copy_in_us +
+                                         process_pdo_us + copy_out_us + send_us;
+            const int64_t unaccounted_us = cycle_us > accounted_us ? cycle_us - accounted_us : 0;
+
+            RCLCPP_WARN(
+                *logging::get_health_checker_logger(),
+                "ECAT LOOP STALL: cycle=%.3f ms scheduler_gap=%.3f ms receive=%.3f ms "
+                "copy_in=%.3f ms process_pdo=%.3f ms copy_out=%.3f ms send=%.3f ms "
+                "unaccounted=%.3f ms raw_pdo_gap=%.3f ms wkc=%d expected=%d",
+                static_cast<double>(cycle_us) / 1000.0,
+                static_cast<double>(scheduler_gap_us) / 1000.0,
+                static_cast<double>(receive_us) / 1000.0,
+                static_cast<double>(copy_in_us) / 1000.0,
+                static_cast<double>(process_pdo_us) / 1000.0,
+                static_cast<double>(copy_out_us) / 1000.0,
+                static_cast<double>(send_us) / 1000.0,
+                static_cast<double>(unaccounted_us) / 1000.0,
+                static_cast<double>(raw_pdo_gap_us) / 1000.0,
+                observed_wkc,
+                expectedWkc_);
         }
     }
 
