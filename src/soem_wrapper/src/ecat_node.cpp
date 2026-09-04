@@ -9,6 +9,7 @@
 #include "soem_wrapper/utils/config_utils.hpp"
 
 #include "ethercat.h"
+#include <time.h>
 
 namespace aim::ecat {
     using namespace aim::utils::config;
@@ -113,6 +114,9 @@ namespace aim::ecat {
                                                    const int64_t receive_us,
                                                    const int64_t copy_in_us,
                                                    const int64_t process_pdo_us,
+                                                   const int64_t process_lock_wait_us,
+                                                   const int64_t process_body_us,
+                                                   const int64_t process_body_cpu_us,
                                                    const int64_t copy_out_us,
                                                    const int64_t send_us,
                                                    const int64_t cycle_us,
@@ -130,6 +134,9 @@ namespace aim::ecat {
         loop_stall_snapshot_.receive_us.store(receive_us);
         loop_stall_snapshot_.copy_in_us.store(copy_in_us);
         loop_stall_snapshot_.process_pdo_us.store(process_pdo_us);
+        loop_stall_snapshot_.process_lock_wait_us.store(process_lock_wait_us);
+        loop_stall_snapshot_.process_body_us.store(process_body_us);
+        loop_stall_snapshot_.process_body_cpu_us.store(process_body_cpu_us);
         loop_stall_snapshot_.copy_out_us.store(copy_out_us);
         loop_stall_snapshot_.send_us.store(send_us);
         loop_stall_snapshot_.cycle_us.store(cycle_us);
@@ -184,12 +191,27 @@ namespace aim::ecat {
         bool previous_cycle_timing_initialized = false;
         int64_t previous_copy_in_us = 0;
         int64_t previous_process_pdo_us = 0;
+        int64_t previous_process_lock_wait_us = 0;
+        int64_t previous_process_body_us = 0;
+        int64_t previous_process_body_cpu_us = -1;
         int64_t previous_copy_out_us = 0;
         int64_t previous_send_us = 0;
         auto previous_send_end = std::chrono::steady_clock::now();
 
         const auto to_us = [](const auto duration) -> int64_t {
             return std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+        };
+
+        // CLOCK_THREAD_CPUTIME_ID advances only while this DATA thread is actually
+        // executing on a CPU. Comparing it with steady-clock wall time separates
+        // CPU work from time spent blocked or preempted by higher-priority work.
+        const auto thread_cpu_now_us = []() -> int64_t {
+            timespec ts{};
+            if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0) {
+                return -1;
+            }
+            return static_cast<int64_t>(ts.tv_sec) * 1000000LL +
+                   static_cast<int64_t>(ts.tv_nsec) / 1000LL;
         };
 
         // all settings updated, mark data cycle as operational
@@ -223,6 +245,9 @@ namespace aim::ecat {
                         receive_us,
                         previous_copy_in_us,
                         previous_process_pdo_us,
+                        previous_process_lock_wait_us,
+                        previous_process_body_us,
+                        previous_process_body_cpu_us,
                         previous_copy_out_us,
                         previous_send_us,
                         raw_pdo_gap_us,
@@ -242,6 +267,10 @@ namespace aim::ecat {
             const auto copy_in_end = std::chrono::steady_clock::now();
 
             const auto process_pdo_start = copy_in_end;
+            int64_t process_lock_wait_us = 0;
+            int64_t process_body_us = 0;
+            int64_t process_body_cpu_us = 0;
+            bool process_body_cpu_valid = true;
 
             // check if all slaves are all ready
             if (!all_slave_ready) {
@@ -267,60 +296,72 @@ namespace aim::ecat {
                 }
             }
 
-            // process pdo device by devices
+            // process pdo device by devices. Time mutex acquisition separately from
+            // the body, then compare body wall time with per-thread CPU time.
             for (const auto &slave: get_slave_devices()) {
-                std::lock_guard lock(slave->mtx_);
+                const auto process_lock_start = std::chrono::steady_clock::now();
+                std::unique_lock lock(slave->mtx_);
+                const auto process_lock_acquired = std::chrono::steady_clock::now();
+                process_lock_wait_us += to_us(process_lock_acquired - process_lock_start);
 
-                // if this device is not fully configured, skip pdo processing
-                if (slave->is_conf_ros_done() == 0
-                    || slave->is_ecat_conf_done() == 0) {
-                    continue;
-                }
+                const int64_t body_cpu_start_us = thread_cpu_now_us();
+                const auto body_start = std::chrono::steady_clock::now();
 
-                // slave report that all args are well-received
-                if (*slave->get_slave_status_ptr() == SLAVE_CONFIRM_READY
-                    && !slave->is_ready()) {
-                    RCLCPP_INFO(*logging::get_data_logger(), "Slave id=%d confirmed ready", slave->get_index());
-                    slave->set_ready(true);
-                }
-
-                // sending args
-                // master will send arg bytes one by one
-                // slave will send what it receives back to the master
-                // to ensure the data is correct
-                if (*slave->get_master_status_ptr() == MASTER_SENDING_ARGUMENTS
-                    && !slave->is_arg_sent()) {
-                    slave->send_arg();
-                }
-
-                // if slave not ready before
-                // but updated to ready in this cycle
-                if (!slave->is_ready()
-                    && slave->is_arg_sent()
-                    && *slave->get_slave_status_ptr() == SLAVE_READY) {
-                    // write initial value for each app
-                    // only write in first initialization
-                    if (*slave->get_master_status_ptr() != MASTER_READY) {
-                        if (slave->get_reconnected_times() == 0) {
-                            slave->write_init_values();
-                        } else {
-                            slave->recover_master_to_slave_buf();
-                            RCLCPP_INFO(*logging::get_health_checker_logger(),
-                                        "Slave id=%d master to slave buf recovered", slave->get_index());
-                        }
-
-                        // after this slave will go into normal working state
-                        RCLCPP_INFO(*logging::get_data_logger(),
-                                    "Slave id=%d sdo confirmed received", slave->get_index());
+                if (slave->is_conf_ros_done() != 0 && slave->is_ecat_conf_done() != 0) {
+                    // slave report that all args are well-received
+                    if (*slave->get_slave_status_ptr() == SLAVE_CONFIRM_READY
+                        && !slave->is_ready()) {
+                        RCLCPP_INFO(*logging::get_data_logger(), "Slave id=%d confirmed ready", slave->get_index());
+                        slave->set_ready(true);
                     }
 
-                    *slave->get_master_status_ptr() = MASTER_READY;
+                    // sending args
+                    // master will send arg bytes one by one
+                    // slave will send what it receives back to the master
+                    // to ensure the data is correct
+                    if (*slave->get_master_status_ptr() == MASTER_SENDING_ARGUMENTS
+                        && !slave->is_arg_sent()) {
+                        slave->send_arg();
+                    }
+
+                    // if slave not ready before
+                    // but updated to ready in this cycle
+                    if (!slave->is_ready()
+                        && slave->is_arg_sent()
+                        && *slave->get_slave_status_ptr() == SLAVE_READY) {
+                        // write initial value for each app
+                        // only write in first initialization
+                        if (*slave->get_master_status_ptr() != MASTER_READY) {
+                            if (slave->get_reconnected_times() == 0) {
+                                slave->write_init_values();
+                            } else {
+                                slave->recover_master_to_slave_buf();
+                                RCLCPP_INFO(*logging::get_health_checker_logger(),
+                                            "Slave id=%d master to slave buf recovered", slave->get_index());
+                            }
+
+                            // after this slave will go into normal working state
+                            RCLCPP_INFO(*logging::get_data_logger(),
+                                        "Slave id=%d sdo confirmed received", slave->get_index());
+                        }
+
+                        *slave->get_master_status_ptr() = MASTER_READY;
+                    }
+
+                    // if slave is ready/working
+                    if (slave->is_ready()) {
+                        current_time = rclcpp::Clock().now();
+                        slave->process_pdo(current_time);
+                    }
                 }
 
-                // if slave is ready/working
-                if (slave->is_ready()) {
-                    current_time = rclcpp::Clock().now();
-                    slave->process_pdo(current_time);
+                const auto body_end = std::chrono::steady_clock::now();
+                const int64_t body_cpu_end_us = thread_cpu_now_us();
+                process_body_us += to_us(body_end - body_start);
+                if (body_cpu_start_us >= 0 && body_cpu_end_us >= body_cpu_start_us) {
+                    process_body_cpu_us += body_cpu_end_us - body_cpu_start_us;
+                } else {
+                    process_body_cpu_valid = false;
                 }
             }
 
@@ -354,6 +395,9 @@ namespace aim::ecat {
 
             previous_copy_in_us = to_us(copy_in_end - copy_in_start);
             previous_process_pdo_us = to_us(process_pdo_end - process_pdo_start);
+            previous_process_lock_wait_us = process_lock_wait_us;
+            previous_process_body_us = process_body_us;
+            previous_process_body_cpu_us = process_body_cpu_valid ? process_body_cpu_us : -1;
             previous_copy_out_us = to_us(copy_out_end - copy_out_start);
             previous_send_us = to_us(send_end - send_start);
             previous_send_end = send_end;
@@ -491,6 +535,9 @@ namespace aim::ecat {
         const int64_t receive_us = loop_stall_snapshot_.receive_us.load();
         const int64_t copy_in_us = loop_stall_snapshot_.copy_in_us.load();
         const int64_t process_pdo_us = loop_stall_snapshot_.process_pdo_us.load();
+        const int64_t process_lock_wait_us = loop_stall_snapshot_.process_lock_wait_us.load();
+        const int64_t process_body_us = loop_stall_snapshot_.process_body_us.load();
+        const int64_t process_body_cpu_us = loop_stall_snapshot_.process_body_cpu_us.load();
         const int64_t copy_out_us = loop_stall_snapshot_.copy_out_us.load();
         const int64_t send_us = loop_stall_snapshot_.send_us.load();
         const int64_t cycle_us = loop_stall_snapshot_.cycle_us.load();
@@ -518,17 +565,28 @@ namespace aim::ecat {
             const int64_t accounted_us = scheduler_gap_us + receive_us + copy_in_us +
                                          process_pdo_us + copy_out_us + send_us;
             const int64_t unaccounted_us = cycle_us > accounted_us ? cycle_us - accounted_us : 0;
+            const int64_t process_offcpu_us = process_body_cpu_us >= 0
+                                                  ? (process_body_us > process_body_cpu_us
+                                                         ? process_body_us - process_body_cpu_us
+                                                         : 0)
+                                                  : -1;
 
             RCLCPP_WARN(
                 *logging::get_health_checker_logger(),
                 "ECAT LOOP STALL: cycle=%.3f ms scheduler_gap=%.3f ms receive=%.3f ms "
-                "copy_in=%.3f ms process_pdo=%.3f ms copy_out=%.3f ms send=%.3f ms "
-                "unaccounted=%.3f ms raw_pdo_gap=%.3f ms wkc=%d expected=%d",
+                "copy_in=%.3f ms process_pdo=%.3f ms process_lock_wait=%.3f ms "
+                "process_body=%.3f ms process_body_cpu=%.3f ms process_offcpu=%.3f ms "
+                "copy_out=%.3f ms send=%.3f ms unaccounted=%.3f ms "
+                "raw_pdo_gap=%.3f ms wkc=%d expected=%d",
                 static_cast<double>(cycle_us) / 1000.0,
                 static_cast<double>(scheduler_gap_us) / 1000.0,
                 static_cast<double>(receive_us) / 1000.0,
                 static_cast<double>(copy_in_us) / 1000.0,
                 static_cast<double>(process_pdo_us) / 1000.0,
+                static_cast<double>(process_lock_wait_us) / 1000.0,
+                static_cast<double>(process_body_us) / 1000.0,
+                static_cast<double>(process_body_cpu_us) / 1000.0,
+                static_cast<double>(process_offcpu_us) / 1000.0,
                 static_cast<double>(copy_out_us) / 1000.0,
                 static_cast<double>(send_us) / 1000.0,
                 static_cast<double>(unaccounted_us) / 1000.0,
@@ -549,7 +607,6 @@ namespace aim::ecat {
             RCLCPP_ERROR(*logging::get_cfg_logger(), "No slaves found!");
             return false;
         }
-
         RCLCPP_INFO(*logging::get_cfg_logger(), "%d slaves found", ec_slavecount);
         init_slave_devices_vector(ec_slavecount);
         // write back to init state
