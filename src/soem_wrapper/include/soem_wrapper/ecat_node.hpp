@@ -64,6 +64,9 @@ namespace aim::ecat {
             std::atomic<int64_t> receive_us{0};
             std::atomic<int64_t> copy_in_us{0};
             std::atomic<int64_t> process_pdo_us{0};
+            std::atomic<int64_t> process_lock_wait_us{0};
+            std::atomic<int64_t> process_body_us{0};
+            std::atomic<int64_t> process_body_cpu_us{-1};
             std::atomic<int64_t> copy_out_us{0};
             std::atomic<int64_t> send_us{0};
             std::atomic<int64_t> cycle_us{0};
@@ -87,6 +90,9 @@ namespace aim::ecat {
                                         int64_t receive_us,
                                         int64_t copy_in_us,
                                         int64_t process_pdo_us,
+                                        int64_t process_lock_wait_us,
+                                        int64_t process_body_us,
+                                        int64_t process_body_cpu_us,
                                         int64_t copy_out_us,
                                         int64_t send_us,
                                         int64_t cycle_us,
