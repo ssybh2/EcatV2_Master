@@ -24,6 +24,7 @@ jobs:
           python3 tests/test_imu_every_pdo_read_policy.py
           python3 tests/test_raw_pdo_gap_diagnostic.py
           python3 tests/test_master_loop_stall_profiler_contract.py
+          python3 tests/test_process_pdo_stall_attribution_contract.py
 
       - name: Setup ROS 2 Humble
         uses: ros-tooling/setup-ros@v0.7
