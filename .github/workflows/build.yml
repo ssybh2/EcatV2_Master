@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - "feature/6imu-large-pdo"
+      - "feature/6imu-rc-dshot-pdo-v006"
+      - "diag/master-loop-stall-profiler-impl"
   workflow_dispatch:
 
 jobs:
@@ -29,6 +31,13 @@ jobs:
           sudo apt-get install -y python3-colcon-common-extensions python3-rosdep
           rosdep update
           rosdep install --from-paths src --ignore-src --rosdistro humble -r -y
+
+      - name: Run master regression contracts
+        shell: bash
+        run: |
+          python3 tests/test_imu_every_pdo_read_policy.py
+          python3 tests/test_raw_pdo_gap_diagnostic.py
+          python3 tests/test_master_loop_stall_profiler_contract.py
 
       - name: Validate 6-IMU helper scripts
         shell: bash
