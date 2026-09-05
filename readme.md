@@ -1,60 +1,83 @@
+<div align="center">
+
 # EcatV2 Master
 
-### ProductCode 0x06 · 6 IMU · DJI RC · DShot
+**ROS 2 + SOEM EtherCAT Master for 6-IMU · DJI RC · DShot**
 
-> 面向 **STM32H750 + AX58100** EtherCAT 从站的 ROS 2 / SOEM Master。
-> 当前版本整合 6 路 HIPNUC IMU、DJI RC / DBUS 输入与 DShot 输出，并提供网页配置工具、部署脚本和运行诊断。
+<p>
+  <img alt="ProductCode" src="https://img.shields.io/badge/ProductCode-0x06-0969da?style=flat-square">
+  <img alt="6 IMU" src="https://img.shields.io/badge/HIPNUC_IMU-6x-2da44e?style=flat-square">
+  <img alt="ROS 2" src="https://img.shields.io/badge/ROS_2-Humble-22314e?style=flat-square">
+  <img alt="EtherCAT" src="https://img.shields.io/badge/EtherCAT-SOEM-c2410c?style=flat-square">
+  <img alt="Hardware" src="https://img.shields.io/badge/Slave-STM32H750_%2B_AX58100-6e7781?style=flat-square">
+  <img alt="Release" src="https://img.shields.io/github/v/release/ssybh2/EcatV2_Master?style=flat-square&label=Release">
+</p>
 
-**当前推荐分支：** `feature/6imu-rc-dshot-pdo-v006`
+面向 **STM32H750 + AX58100** EtherCAT 从站的 ROS 2 Master。  
+当前分支整合 **6 × HIPNUC IMU、DJI RC / DBUS、DShot、TaskEditor 与运行诊断**。
+
+**Current branch:** `feature/6imu-rc-dshot-pdo-v006`
+
+</div>
+
+> [!IMPORTANT]
+> 当前使用 **ProductCode `0x06`**。Master、Slave、EEPROM 与配置文件必须使用同一套 profile。
 
 ---
 
-## 当前版本
+## 系统拓扑
 
-| 项目 | 当前配置 |
-| --- | --- |
-| EtherCAT Profile | `ProductCode 0x00000006` |
-| Application PDO | Master → Slave `80 B` · Slave → Master `192 B` |
-| 功能 | 6 × IMU · DJI RC / DBUS · DShot |
-| 实机状态 | STM32H750 + AX58100 已进入 OP，6-IMU 链路已运行 |
+```mermaid
+flowchart LR
+    subgraph INPUT["Sensors & Control"]
+        IMU["6 × HIPNUC IMU"]
+        RC["DJI RC / DBUS"]
+    end
 
-更详细的 PDO offset、task 配置、EEPROM / SII 和诊断字段不在首页展开，统一放在部署文档中。
+    subgraph SLAVE["EtherCAT Slave"]
+        H750["STM32H750"]
+        AX["AX58100"]
+        DSHOT["DShot Output"]
+    end
 
----
+    subgraph MASTER["EcatV2 Master"]
+        SOEM["SOEM"]
+        ROS["ROS 2"]
+    end
 
-## 系统结构
+    subgraph ROSIF["ROS 2 Interfaces"]
+        IMUTOPIC["6 × IMU Topics"]
+        RCTOPIC["DJI RC Topic"]
+        DSHOTCMD["DShot Command"]
+    end
 
-```text
-6 × HIPNUC IMU
-      │
-      │ CAN1 / CAN2
-      ▼
-STM32H750 + AX58100
-      │
-      │ EtherCAT
-      ▼
-EcatV2 Master / SOEM
-      │
-      ▼
-     ROS 2
-      │
-      ├── 6 × IMU topics
-      ├── DJI RC / DBUS
-      └── DShot
+    IMU -->|CAN1 / CAN2| H750
+    RC --> H750
+    H750 <--> AX
+    AX <-->|EtherCAT| SOEM
+    SOEM <--> ROS
+    ROS --> IMUTOPIC
+    ROS --> RCTOPIC
+    DSHOTCMD --> ROS
+    H750 --> DSHOT
 ```
+
+<div align="center">
+<sub>HIPNUC / DJI RC → STM32H750 → AX58100 → EtherCAT → SOEM → ROS 2</sub>
+</div>
 
 ---
 
 ## 快速开始
 
-### 1. 使用当前分支
+### 1 · 切换到当前分支
 
 ```bash
 git checkout feature/6imu-rc-dshot-pdo-v006
 git submodule update --init --recursive
 ```
 
-### 2. 生成本机 bringup
+### 2 · 生成本机 bringup
 
 ```bash
 ./tools/prepare_6imu_rc_dshot_bringup.sh \
@@ -64,9 +87,7 @@ git submodule update --init --recursive
   <non-rt-cpus>
 ```
 
-脚本会根据当前 ProductCode 0x06 模板创建本机 `soem_bringup` 配置。
-
-### 3. 编译并启动
+### 3 · 编译并启动
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -78,68 +99,62 @@ ros2 launch soem_bringup bringup.launch.py
 
 ---
 
-## TaskEditor
+## 在线 TaskEditor
 
-不想手动编辑 YAML 时，可以直接使用在线配置工具：
+<div align="center">
 
-### [Open ProductCode 0x06 TaskEditor](https://ssybh2.github.io/EcatV2_Master/)
+### 🧩 [Open ProductCode 0x06 TaskEditor](https://ssybh2.github.io/EcatV2_Master/)
 
-可以配置 Slave Serial、6 个 IMU topic / frame、DJI RC topic 以及 DShot 参数，并直接生成 `config.yaml`。
+无需手动整理 YAML，可直接生成当前 8-task `config.yaml`。
 
-源码位于：`web/6imu-task-editor/`
-
----
-
-## 文档入口
-
-第一次部署建议直接从完整教程开始：
-
-- **[完整部署教程（小白版）](docs/6imu-deployment-beginner-cn.md)** — 从 Ubuntu 环境、固件烧录到 ROS 2 验收
-- **[ProductCode 0x06 部署说明](docs/6imu-dji-rc-dshot-deployment-cn.md)** — PDO、EEPROM / SII 与当前实机基线
-- **[TaskEditor 说明](docs/6imu-task-editor.md)** — 8-task 配置生成器
-- **[6-IMU 压力测试计划](docs/6imu-500hz-test-plan.md)** — 多 IMU、诊断与稳定性验证
+</div>
 
 ---
 
-## 配套固件
+## 文档与资源
 
-| 模块 | 推荐版本 |
+| 入口 | 用途 |
 | --- | --- |
-| Master | `ssybh2/EcatV2_Master` · `feature/6imu-rc-dshot-pdo-v006` |
-| H750 + AX58100 Slave | `ssybh2/EcatV2_AX58100_H750_Universal` · `feature/6imu-rc-dshot-pdo-v006` · Release `v0.6.1` |
-| HIPNUC G431 bridge | `ssybh2/hipnucimu` · `feature/6imu-500hz-stable` |
+| 📘 **[完整部署教程（小白版）](docs/6imu-deployment-beginner-cn.md)** | 从环境、固件到 ROS 2 验收 |
+| ⚙️ **[ProductCode 0x06 部署说明](docs/6imu-dji-rc-dshot-deployment-cn.md)** | PDO、EEPROM / SII 与部署基线 |
+| 🧩 **[TaskEditor 说明](docs/6imu-task-editor.md)** | 8-task 配置生成器 |
+| 🧪 **[6-IMU 压力测试计划](docs/6imu-500hz-test-plan.md)** | 多 IMU 与稳定性验证 |
+| 📦 **[Master Releases](https://github.com/ssybh2/EcatV2_Master/releases)** | Deployment Bundle 与版本发布 |
 
-> Master、Slave、EEPROM 和配置文件必须使用同一套 ProductCode 0x06 profile。
+---
+
+## 配套组件
+
+| Component | Recommended |
+| --- | --- |
+| **Master** | `feature/6imu-rc-dshot-pdo-v006` |
+| **H750 + AX58100 Slave** | [Release v0.6.1](https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/releases/tag/v0.6.1) |
+| **HIPNUC G431 bridge** | `feature/6imu-500hz-stable` |
 
 ---
 
 ## 当前状态
 
-- ✅ ProductCode 0x06 EtherCAT profile
-- ✅ 6 × HIPNUC IMU
-- ✅ DJI RC / DBUS 软件链路
-- ✅ DShot 软件链路
-- ✅ 在线 TaskEditor
-- ✅ RAW PDO GAP / EtherCAT loop stall diagnostics
-- ✅ STM32H750 + AX58100 SAFE_OP / OP 实机验证
+> ✅ **6-IMU + EtherCAT** 已完成当前实机基线验证并可进入 OP。  
+> 🟡 **DJI RC / DShot** 软件链路已集成，最终遥控器 / 执行器实机测试仍应按具体硬件与安全条件完成。
 
-DJI RC 和 DShot 的最终实机功能测试仍应按具体硬件和安全条件分别完成。
+<details>
+<summary><b>Legacy / Safety</b></summary>
 
----
+<br>
 
-## Legacy
-
-旧 ProductCode `0x05` / 160 B S→M profile 仍保留用于历史兼容，但**不要与当前 0x06 配置混用**。
-
----
-
-## Safety
+旧 ProductCode `0x05` profile 仅保留用于历史兼容，**不要与当前 `0x06` 配置混用**。
 
 首次进行 DShot 实机测试时，请先卸下桨叶或解除机械负载，并准备可靠的断电方式。
 
+</details>
+
 ---
+
+<div align="center">
 
 ### Related repositories
 
-- [H750 + AX58100 Slave](https://github.com/ssybh2/EcatV2_AX58100_H750_Universal)
-- [HIPNUC IMU Forward Bridge](https://github.com/ssybh2/hipnucimu)
+[H750 + AX58100 Slave](https://github.com/ssybh2/EcatV2_AX58100_H750_Universal) · [HIPNUC IMU Forward Bridge](https://github.com/ssybh2/hipnucimu)
+
+</div>
