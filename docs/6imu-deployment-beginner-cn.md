@@ -8,7 +8,7 @@
 > 2. [First Run Test（原版）](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/first-run-test.md)
 > 3. [Configuration Generator（原版）](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/configuration-generator.md)
 >
-> 与我们新增的 **ProductCode 0x06 固件、192B S→M PDO、6IMU + DJI RC + DShot、8-task TaskEditor 和压力测试** 合并成一条完整流程。
+> 与我们新增的 **ProductCode 0x06 固件、192B S→M PDO、6IMU + DJI RC + DShot、8-task TaskEditor、Master timing diagnostics 和压力测试** 合并成一条完整流程。
 >
 > 最终启动命令与原仓库保持一致：
 >
@@ -16,11 +16,13 @@
 > ros2 launch soem_bringup bringup.launch.py
 > ```
 >
-> 适用分支：
+> 当前适用分支：
 >
 > - Master：`ssybh2/EcatV2_Master -> feature/6imu-rc-dshot-pdo-v006`
 > - H750 Slave：`ssybh2/EcatV2_AX58100_H750_Universal -> feature/6imu-rc-dshot-pdo-v006`
 > - HIPNUC bridge：`ssybh2/hipnucimu -> feature/6imu-500hz-stable`
+>
+> 当前推荐 H750 正式 Release：`v0.6.1`。
 
 ---
 
@@ -90,8 +92,7 @@ SM2 / Outputs = 81 B
 SM3 / Inputs  = 193 B
 ```
 
-前 126B 是六个 IMU 数据，126..159 是原有诊断区，
-160..178 是 DJI RC；DShot 使用 M→S offset 0..7。
+前 126B 是六个 IMU 数据，126..159 是诊断区，160..178 是 DJI RC；DShot 使用 M→S offset 0..7。
 
 ---
 
@@ -147,14 +148,7 @@ Ubuntu 22.04 + ROS 2 Humble
 
 也能工作。
 
-我们的 `feature/6imu-rc-dshot-pdo-v006` CI 当前就是在：
-
-```text
-Ubuntu 22.04
-ROS 2 Humble
-```
-
-完整编译验证，所以这份小白教程优先按：
+当前 `feature/6imu-rc-dshot-pdo-v006` CI 仍包含 Ubuntu 22.04 / ROS 2 Humble 编译验证，所以这份小白教程继续优先按：
 
 ```text
 Ubuntu 22.04 + ROS 2 Humble
@@ -245,7 +239,7 @@ nohz=on nohz_full=0 rcu_nocbs=0 isolcpus=0 irqaffinity=1,2,3,4,5,6,7
 
 ### Hyper-Threading 用户注意
 
-原版特别提醒：如果一个物理核心对应多个逻辑线程，应尽量隔离**完整物理核心**，不要只隔离其中一个 sibling thread。
+如果一个物理核心对应多个逻辑线程，应尽量隔离**完整物理核心**，不要只隔离其中一个 sibling thread。
 
 修改并重启后检查：
 
@@ -294,15 +288,13 @@ non_rt_cpus = 1-7
 
 这里仿照原版 [Environment Setup](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/environment-setup.md) 的结构。
 
-例如建立：
-
 ```bash
 mkdir -p ~/ecat_ws/src
 cd ~/ecat_ws
 git init
 ```
 
-最终我们希望得到：
+最终希望得到：
 
 ```text
 ecat_ws/
@@ -347,8 +339,6 @@ feature/6imu-rc-dshot-pdo-v006
 
 ### 以后更新 Master
 
-如果仍然把它作为父 workspace 的 submodule 管理，可以进入：
-
 ```bash
 cd ~/ecat_ws/src/EcatV2_Master
 git pull
@@ -360,8 +350,6 @@ git submodule update --init --recursive
 ---
 
 ## 7. 安装 workspace 依赖
-
-回到 workspace：
 
 ```bash
 cd ~/ecat_ws
@@ -388,7 +376,7 @@ rosdep update
 rosdep install --from-paths src --ignore-src -r -y
 ```
 
-到这里还不需要 `colcon build`，因为我们后面还要创建 `soem_bringup`。
+到这里还不需要 `colcon build`，因为后面还要创建 `soem_bringup`。
 
 ---
 
@@ -396,7 +384,7 @@ rosdep install --from-paths src --ignore-src -r -y
 
 ## 8. 下载 3 种 HIPNUC 固件
 
-打开自己的仓库 Actions：
+打开：
 
 https://github.com/ssybh2/hipnucimu/actions
 
@@ -433,11 +421,11 @@ slot2 -> 0x04 / 0x05 / 0x06
 slot3 -> 0x07 / 0x08 / 0x09
 ```
 
+> 注意：bridge 分支名字中仍然有 `500hz`。后面 Master 的 `sequenced_imu_period_us` 是**诊断阈值/期望样本周期参数**，不是用来给 G431 生成采样频率的。实际验收频率必须与本次烧录和从站配置的真实输出频率一致。
+
 ---
 
 ## 9. 给 6 个转接板贴标签
-
-先贴：
 
 ```text
 C1-S1
@@ -488,15 +476,13 @@ ST-LINK
 → Reset
 ```
 
-### 成功标准
-
-看到 Program / Verify 成功。
+成功标准：看到 Program / Verify 成功。
 
 不要再手动修改 `main.c` 的 CAN ID；三种固件已经分别构建好。
 
 ### 如果 G431 提示写保护：先解除保护，再彻底断电后烧录
 
-实际部署中有些 STM32G431 bridge 会处于 Flash 写保护状态。直接烧录时可能看到类似：
+如果看到：
 
 ```text
 flash memory write protected
@@ -505,30 +491,24 @@ block write failed
 timeout waiting for algorithm
 ```
 
-这种情况下不要连续反复点 Download。可以在 Ubuntu 上用 OpenOCD 先解除保护。
-
-如果没有 OpenOCD：
+不要连续反复点 Download。可以在 Ubuntu 上用 OpenOCD 先解除保护。
 
 ```bash
 sudo apt update
 sudo apt install -y openocd
 ```
 
-下面假设 3 种 slot 固件已经解压到：
+假设固件在：
 
 ```text
 ~/Downloads/hipnucimu-500hz-slots
 ```
 
-进入目录：
+执行：
 
 ```bash
 cd ~/Downloads/hipnucimu-500hz-slots
-```
 
-先解除 G431 Flash 写保护：
-
-```bash
 openocd \
   -f interface/stlink.cfg \
   -f target/stm32g4x.cfg \
@@ -548,10 +528,6 @@ cleared protection for sectors 0 through 63
 stm32l4x option load completed. Power-on reset might be required
 ```
 
-这里有一个实际踩过的坑：
-
-> `option_load` 完成后，如果立刻执行烧录，第一次仍然可能失败。不要继续重复烧。先让 G431 **彻底断电**，再重新上电。
-
 正确顺序：
 
 ```text
@@ -567,8 +543,6 @@ stm32l4x option load completed. Power-on reset might be required
 以 `slot3` 为例：
 
 ```bash
-cd ~/Downloads/hipnucimu-500hz-slots
-
 openocd \
   -f interface/stlink.cfg \
   -f target/stm32g4x.cfg \
@@ -588,27 +562,7 @@ wrote ... bytes from file hipnucimu_slot3.hex
 verified ... bytes
 ```
 
-`slot1` / `slot2` 的操作完全相同，只需要把文件名换成：
-
-```text
-hipnucimu_slot1.hex
-hipnucimu_slot2.hex
-```
-
-如果只是想确认某块 G431 现在是否已经精确刷成对应 slot，而不想重刷，可以只做非破坏性 verify。例如检查 slot3：
-
-```bash
-openocd \
-  -f interface/stlink.cfg \
-  -f target/stm32g4x.cfg \
-  -c "adapter speed 100" \
-  -c "init" \
-  -c "halt" \
-  -c "verify_image hipnucimu_slot3.hex" \
-  -c "shutdown"
-```
-
-> `verify_image` 会让 MCU 进入 halt 状态；验证完成后建议 reset 或重新断电上电再正式使用。
+只想确认而不重刷，可以使用 `verify_image`。验证完成后建议 reset 或重新断电上电再正式使用。
 
 ---
 
@@ -616,23 +570,39 @@ openocd \
 
 ## 11. 下载 ProductCode 0x06 H750 从站固件
 
-正式部署优先使用已经完成真机验证的 GitHub Release：
+当前正式部署优先使用最新 ProductCode 0x06 Release：
 
 ```text
 https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/releases
 ```
 
-选择 `v0.6.0`，推荐下载：
+当前推荐：
 
 ```text
-EcatV2_AX58100_H750_Universal_v0.6.0.elf
-EcatV2_AX58100_H750_Universal_v0.6.0.hex
-EcatV2_AX58100_H750_Universal_v0.6.0.bin
-AX58100_EEPROM_ProductCode_0x06.bin
-SHA256SUMS.txt
+v0.6.1
 ```
 
-第一次烧 H750 推荐使用 `.elf`。
+Release 页面当前提供 v0.6.1 固件压缩包附件；以 Release 页面显示的实际附件名为准。下载并解压后，第一次烧 H750 推荐优先使用包内提供的 `.elf`，也可以使用 `.hex`。
+
+### 为什么不再推荐 v0.6.0？
+
+`v0.6.1` 在 ProductCode、EEPROM 和 PDO 布局不变的情况下，修复了 IMU 数据快照一致性问题：
+
+```text
+coherent IMU payload + sample sequence publication
+ISR-safe double-buffered IMU snapshots
+atomic snapshot publication
+```
+
+也就是避免出现：
+
+```text
+Sample N payload
++
+Sample N+1 sequence
+```
+
+这种不一致组合。
 
 如果需要最新开发构建，也可以打开：
 
@@ -640,11 +610,9 @@ SHA256SUMS.txt
 https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/actions
 ```
 
-选择当前 `feature/6imu-rc-dshot-pdo-v006` 分支的
-`Build ProductCode 0x06 Slave Firmware`，下载 Actions artifact。
+选择当前 `feature/6imu-rc-dshot-pdo-v006` 分支的 `Build ProductCode 0x06 Slave Firmware`，下载 Actions artifact。
 
-> Release 保存经过硬件验证的稳定版本；Actions artifact 保存最新开发构建。
-> 正式部署优先使用 Release。
+> 正式部署优先 Release；调试最新改动时再使用 Actions artifact。
 
 ---
 
@@ -656,13 +624,11 @@ CubeProgrammer：
 ST-LINK / SWD
 → Connect
 → Open File
-→ EcatV2_AX58100_H750_Universal.elf
+→ 选择 v0.6.1 包内 H750 .elf 或 .hex
 → Download
 → Verify
 → Reset
 ```
-
-### 注意
 
 这一步只更新：
 
@@ -708,9 +674,7 @@ GND
 
 尽量采用总线结构，不要做很长的星形分叉。
 
-一条 CAN 总线通常只在最远两端放 120Ω。
-
-断电测量 CANH 与 CANL，如果两端各一个 120Ω，通常约：
+一条 CAN 总线通常只在最远两端放 120Ω。断电测量 CANH 与 CANL，如果两端各一个 120Ω，通常约：
 
 ```text
 60 Ω
@@ -738,8 +702,6 @@ EtherCAT Slave IN
 
 ## 15. 找 Master 网卡名字
 
-Ubuntu：
-
 ```bash
 ip -br link
 ```
@@ -766,12 +728,9 @@ EtherCAT NIC = enp3s0
 
 # Part F：刷 ProductCode 0x06 EEPROM
 
-本版本使用已经完成真机验证的 2048-byte AX58100 EEPROM 镜像。
+本版本使用 2048-byte AX58100 EEPROM 镜像。
 
-当前板卡的 SII 中没有静态 RxPDO/TxPDO category；81B / 193B 的
-process-data mapping 由 H750 上的 SOES / CoE Object Dictionary 动态提供。
-因此 ProductCode 0x06 EEPROM 基于已知可工作的 0x05 SII，仅修改
-ProductCode 字段 `0x05 -> 0x06`，无需为 192B PDO 重新生成静态 SII PDO category。
+当前板卡的 SII 中没有静态 RxPDO/TxPDO category；81B / 193B 的 process-data mapping 由 H750 上的 SOES / CoE Object Dictionary 动态提供。因此 ProductCode 0x06 EEPROM 基于已知可工作的 0x05 SII，仅修改 ProductCode 字段 `0x05 -> 0x06`，无需为 192B PDO 重新生成静态 SII PDO category。
 
 ## 16. 先确认能看到目标从站
 
@@ -789,8 +748,7 @@ sudo ./tools/slaveinfo enp3s0
 Product Code     : 00000005
 ```
 
-在写 EEPROM 前必须能够找到目标 slave。完全找不到 slave 时不要写 EEPROM，
-先检查网卡、网线、Slave IN、供电和 LINK 状态。
+在写 EEPROM 前必须能够找到目标 slave。完全找不到 slave 时不要写 EEPROM，先检查网卡、网线、Slave IN、供电和 LINK 状态。
 
 ---
 
@@ -899,22 +857,9 @@ Operational state reached for all slaves.
 
 这一部分对应原版 [First Run Test 教程](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/first-run-test.md)。
 
-原版做法是手工：
-
-```text
-ros2 pkg create soem_bringup
-→ 创建 config/
-→ 创建 launch/
-→ 修改 CMakeLists.txt
-→ 写 config.yaml
-→ 写 bringup.launch.py
-```
-
-为了避免小白手改文件出错，我们的 6-IMU 分支提供脚本自动完成**同样的最终结构**。
+为了避免小白手改文件出错，6-IMU 分支提供脚本自动完成原版教程最终需要的 bringup package 结构。
 
 ## 19. 第一次先用假 SN 创建 bringup package
-
-我们还不知道板子的真实 SN。
 
 先假设：
 
@@ -964,20 +909,18 @@ non_rt_cpus
     └── bringup.launch.py
 ```
 
-这就是原仓库 [First Run Test](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/first-run-test.md) 的 bringup package，只是我们替你自动生成。
-
 ---
 
 ## 20. 理解 bringup.launch.py 的作用
 
-最终 launch 文件做的事情是：
+最终 launch 文件启动：
 
 ```text
-启动 package = soem_wrapper
-executable    = soem_backend
+package    = soem_wrapper
+executable = soem_backend
 ```
 
-同时传入：
+并传入：
 
 ```text
 interface
@@ -986,35 +929,69 @@ non_rt_cpus
 config_file
 ```
 
-而 `config_file` 来自：
+`config_file` 来自：
 
 ```text
 soem_bringup/config/config.yaml
 ```
 
-所以注意：
+所以：
 
 ```text
 soem_wrapper  = 真正的 EtherCAT Master 程序
 soem_bringup  = 你的项目启动包
 ```
 
-最终命令因此是：
+最终启动命令：
 
 ```bash
 ros2 launch soem_bringup bringup.launch.py
 ```
 
+### 当前 Master 新增的 timing 参数
+
+当前 Master 还提供：
+
+```text
+sequenced_imu_period_us          默认 3000 us
+loop_stall_profile_threshold_us  默认 5000 us
+```
+
+这里必须理解清楚：
+
+```text
+sequenced_imu_period_us
+```
+
+主要用于 Master 判断一次 `RAW PDO GAP` 是否已经达到“可能错过一个 sequenced IMU sample”的时间尺度；它**不会替代 G431/H750 本身的采样与转发频率设置**。
+
+如果本次系统实际按 500 Hz 运行，对应样本周期是：
+
+```text
+2000 us
+```
+
+这时建议在 `bringup.launch.py` 的 parameters 中显式增加：
+
+```python
+'sequenced_imu_period_us': 2000,
+```
+
+如果本次测试基线按约 333.33 Hz / 3 ms 运行，则保留默认：
+
+```python
+'sequenced_imu_period_us': 3000,
+```
+
+不要只根据这个参数推断实际 ROS topic rate；最终还是以真实 `ros2 topic hz` 和从站/bridge 配置为准。
+
 ---
 
 ## 21. 第一次 colcon build
 
-回 workspace：
-
 ```bash
 cd ~/ecat_ws
 source /opt/ros/humble/setup.bash
-
 colcon build
 ```
 
@@ -1029,40 +1006,9 @@ ros2 pkg prefix soem_bringup
 
 两个命令都应该返回 install 路径。
 
-### workspace 最终结构
-
-```text
-ecat_ws/
-├── src/
-│   ├── EcatV2_Master/
-│   │   ├── src/
-│   │   │   ├── soem_wrapper/
-│   │   │   ├── soem/
-│   │   │   └── custom_msgs/
-│   │   ├── tools/
-│   │   ├── eeproms/
-│   │   └── web/
-│   │
-│   └── soem_bringup/
-│       ├── CMakeLists.txt
-│       ├── package.xml
-│       ├── config/
-│       │   └── config.yaml
-│       └── launch/
-│           └── bringup.launch.py
-│
-├── build/
-├── install/
-└── log/
-```
-
 ---
 
 ## 22. 第一次启动：故意用假 SN 找真实 SN
-
-原版教程的关键技巧就是：
-
-> 先让 Master 发现 slave，再从日志读出真实 SN；即使后面因为 YAML 中 SN 不匹配而退出，这次启动仍然有价值。
 
 打开 root shell：
 
@@ -1086,15 +1032,7 @@ ros2 launch soem_bringup bringup.launch.py
 ros2 launch soem_wrapper bringup.launch.py
 ```
 
-最终正确命令就是：
-
-```bash
-ros2 launch soem_bringup bringup.launch.py
-```
-
-### 你要找的日志
-
-类似：
+你要找的日志类似：
 
 ```text
 Found slave id=1, sn=2883658, eepid=6, type=H750UniversalModule (6-IMU + RC + DSHOT)
@@ -1110,8 +1048,6 @@ Found slave id=1, sn=2883658, eepid=6, type=H750UniversalModule (6-IMU + RC + DS
 
 因为当前 config 还是假 SN `1234567`，后面可能出现 key-not-found/找不到配置，这在**第一次找 SN 的阶段是预期现象**。
 
-记下真实 SN。
-
 ---
 
 # Part H：Generate Config File —— 生成最终 config.yaml
@@ -1119,8 +1055,6 @@ Found slave id=1, sn=2883658, eepid=6, type=H750UniversalModule (6-IMU + RC + DS
 这一部分对应原版 [Configuration Generator 教程](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/configuration-generator.md)。
 
 你有两种方法。
-
----
 
 ## 23A. 推荐：使用 ProductCode 0x06 8-task TaskEditor
 
@@ -1132,15 +1066,22 @@ https://ssybh2.github.io/EcatV2_Master/
 
 https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006/web/6imu-task-editor
 
+当前 TaskEditor 已经是两页式界面：
+
+```text
+01 Module Settings
+02 Generated config.yaml
+```
+
 ### Step 1：Module Settings
 
-输入刚才日志得到的真实 SN，例如：
+输入真实 SN，例如：
 
 ```text
 2883658
 ```
 
-默认六个 IMU 应该是：
+默认六个 IMU：
 
 ```text
 CAN1 Slot1 -> 01/02/03 -> offset 0
@@ -1163,7 +1104,17 @@ CAN2 Slot3 -> 07/08/09 -> offset 105
 /imu/can2/slot3
 ```
 
-### Step 2：Config Generator
+当前页面还能直接编辑：
+
+```text
+Slave Serial
+Latency Topic
+IMU CAN ID / topic / frame
+DJI RC topic
+DShot topic / id / init value / connection lost action
+```
+
+### Step 2：确认 Module Settings 状态
 
 确认：
 
@@ -1171,23 +1122,43 @@ CAN2 Slot3 -> 07/08/09 -> offset 105
 task_count = 8
 sdo_len = 91
 Slave -> Master = 192B
+Master -> Slave = 80B
 DJI RC = Task 7 @ read offset 160
 DShot  = Task 8 @ write offset 0
 ```
 
-并且没有红色错误。
-
-### Step 3：Download config.yaml
-
-点击下载：
+并且状态为：
 
 ```text
-config.yaml
+Ready
 ```
 
-### Step 4：放进 bringup package
+不要带着红色 errors 下载最终配置。
 
-文件应该放到：
+### Step 3：打开 Generated config.yaml
+
+点击：
+
+```text
+Open Generated config.yaml
+```
+
+或者顶部切到：
+
+```text
+02 Generated config.yaml
+```
+
+这里会显示实时 YAML preview，并提供：
+
+```text
+Copy
+Download
+```
+
+### Step 4：Download config.yaml
+
+下载后放到：
 
 ```text
 ~/ecat_ws/src/soem_bringup/config/config.yaml
@@ -1199,17 +1170,13 @@ config.yaml
 src/soem_wrapper/config/
 ```
 
-这点与原仓库 [Configuration Generator](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/configuration-generator.md) 的思想完全一致：
-
-```text
 配置文件属于 bringup package。
-```
 
 ---
 
 ## 23B. 更省事：重新运行 helper
 
-如果你使用默认 6-IMU 拓扑，不想从网页下载：
+如果你使用默认 6-IMU 拓扑：
 
 ```bash
 cd ~/ecat_ws/src/EcatV2_Master
@@ -1221,7 +1188,7 @@ cd ~/ecat_ws/src/EcatV2_Master
   1-7
 ```
 
-它会直接重新生成：
+它会重新生成：
 
 ```text
 ~/ecat_ws/src/soem_bringup/config/config.yaml
@@ -1230,11 +1197,19 @@ cd ~/ecat_ws/src/EcatV2_Master
 
 并保留旧文件备份。
 
+如果你要进行明确的 500 Hz timing diagnostic 验收，helper 生成完成后再编辑 `bringup.launch.py`，在 parameters 里加入：
+
+```python
+'sequenced_imu_period_us': 2000,
+```
+
+当前 helper 本身仍保持原来的 4 参数接口。
+
 ---
 
 ## 24. 再 build 一次
 
-因为 bringup package 的 config/launch 是 install 到 `install/soem_bringup/share/...` 的，所以每次改完需要：
+因为 bringup package 的 config/launch 会 install 到 `install/soem_bringup/share/...`，所以每次改完需要：
 
 ```bash
 cd ~/ecat_ws
@@ -1266,9 +1241,7 @@ source install/setup.bash
 ros2 launch soem_bringup bringup.launch.py
 ```
 
-### 成功日志重点
-
-应看到类似：
+成功日志重点：
 
 ```text
 1 slaves found
@@ -1346,13 +1319,10 @@ linear_acceleration
 
 ```bash
 ros2 topic echo /dji_rc
+ros2 topic hz /dji_rc
 ```
 
 操作遥控器摇杆、拨杆等控制量，数据应实时变化。
-
-```bash
-ros2 topic hz /dji_rc
-```
 
 ### 检查 DShot ROS 2 接口
 
@@ -1361,15 +1331,13 @@ ros2 topic info /dshot -v
 ros2 interface show custom_msgs/msg/WriteDSHOT
 ```
 
-第一次部署先确认 topic/type/QoS 正常。真正进行非零 DShot 输出前，
-应确保电机、桨叶和执行机构处于安全测试状态。
-
+第一次部署先确认 topic/type/QoS 正常。真正进行非零 DShot 输出前，应确保电机、桨叶和执行机构处于安全测试状态。
 
 ---
 
-## 28. 检查 500 Hz
+## 28. 检查 IMU 实际频率
 
-例如：
+先测一个：
 
 ```bash
 ros2 topic hz /imu/can1/slot1
@@ -1377,10 +1345,26 @@ ros2 topic hz /imu/can1/slot1
 
 等待几秒。
 
-目标：
+### 不再把“500 Hz”写死成所有 0x06 系统的唯一标准
+
+正确判断方法是：
 
 ```text
-average rate 接近 500 Hz
+ROS topic rate 应稳定接近本次实际部署配置的 IMU 输出频率
+```
+
+如果这套真机确实使用 500 Hz bridge / slave 配置：
+
+```text
+目标 ≈ 500 Hz
+sequenced_imu_period_us 建议 = 2000
+```
+
+如果你的当前测试基线是约 333.33 Hz / 3 ms：
+
+```text
+目标 ≈ 333.33 Hz
+sequenced_imu_period_us = 3000
 ```
 
 然后六个分别检查：
@@ -1394,7 +1378,7 @@ ros2 topic hz /imu/can2/slot2
 ros2 topic hz /imu/can2/slot3
 ```
 
-不要执着于每一秒精确 `500.000 Hz`；重点是稳定接近目标，而且没有持续掉线/大幅波动。
+不要执着于某一秒精确等于目标值；重点是长期稳定、没有持续掉线和大幅波动。
 
 ---
 
@@ -1402,9 +1386,9 @@ ros2 topic hz /imu/can2/slot3
 
 完整中英双语版本见：
 
-[6-IMU / 500 Hz 压力测试计划](6imu-500hz-test-plan.md)
+[ProductCode 0x06 · 6-IMU 压力测试计划](6imu-500hz-test-plan.md)
 
-这里给第一次部署所需的中文执行顺序。
+> 文件名为了兼容旧链接仍保留 `500hz`，但文档内容已按 ProductCode 0x06 / 192B PDO / 当前 Master diagnostics 更新，并区分“实际 500 Hz 测试”和“3 ms timing baseline”。
 
 ## 29. 不要第一步就上 6 个
 
@@ -1414,7 +1398,7 @@ ros2 topic hz /imu/can2/slot3
 | --- | --- | ---: | --- |
 | A | CAN1 只接 Slot1 | 5 分钟 | 验证最小链路 |
 | B | CAN1 接 Slot1+Slot2 | 10 分钟 | 验证双 IMU |
-| C | CAN1 接 Slot1+Slot2+Slot3 | 15~30 分钟 | **重点验证单总线 3×500Hz** |
+| C | CAN1 接 Slot1+Slot2+Slot3 | 15~30 分钟 | 重点验证单总线 3 IMU |
 | D | CAN1 三个 + CAN2 Slot1 | 10 分钟 | 验证第二路 CAN |
 | E | CAN1 三个 + CAN2 两个 | 15 分钟 | 接近满载 |
 | F | CAN1 三个 + CAN2 三个 | ≥30 分钟 | 最终满载验收 |
@@ -1434,10 +1418,12 @@ ros2 topic hz <topic>
 目标：
 
 ```text
-接近 500 Hz
-稳定
+稳定接近本次实际配置频率
 不周期性掉到 0
+不随机消失
 ```
+
+500 Hz 配置就按约 500 Hz 验收；3 ms 基线就按约 333.33 Hz 验收。
 
 ### 30.2 数据内容
 
@@ -1449,7 +1435,7 @@ ros2 topic echo <topic> --once
 
 ### 30.3 EtherCAT 主站日志
 
-我们的 Master 会监测 192B S→M PDO，其中 126..159 仍是 6-IMU 诊断区。
+Master 会监测 192B S→M PDO，其中 126..159 是 6-IMU 诊断区。
 
 正常情况下不应该持续出现：
 
@@ -1457,9 +1443,11 @@ ros2 topic echo <topic> --once
 6-IMU CAN RX diagnostics changed
 6-IMU #N incomplete P1/P2/P3 sample(s)
 6-IMU #N sample sequence jumped
+RAW PDO GAP
+ECAT LOOP STALL
 ```
 
-这些 warning 的含义见后面。
+一次启动瞬间 warning 和持续增长/持续出现不是一回事。
 
 ### 30.4 物理层
 
@@ -1492,23 +1480,21 @@ CAN1 full=...
 问题重点 = H750 CAN 接收/FIFO/中断实时性
 ```
 
-先不要怀疑 160B PDO。
+先不要把问题归因于 192B PDO 大小。
 
 ### 情况 2：incomplete P1/P2/P3 增长，但 FIFO clean
-
-日志：
 
 ```text
 6-IMU #N incomplete P1/P2/P3 sample(s)
 ```
 
-而 FIFO lost/full 没增长：
+而 FIFO lost/full 没增长，说明 H750 没得到完整的：
 
 ```text
-H750 没得到完整的 P1 -> P2 -> P3
+P1 -> P2 -> P3
 ```
 
-检查顺序：
+检查：
 
 ```text
 IMU bridge TX
@@ -1520,18 +1506,11 @@ IMU bridge TX
 
 ### 情况 3：IMU bridge can_tx_group_deferred_count 增长
 
-说明：
-
-```text
-前一个样本的 3 个 CAN frame 还没发完
-下一个 2ms 样本又来了
-```
-
-这说明该 CAN 总线已经开始逼近实际吞吐极限。
+说明前一个样本的 3 个 CAN frame 还没发完，下一个样本又来了。它是 CAN TX 队列/总线负载逼近实际吞吐极限的信号。
 
 ### 情况 4：can_tx_fail / Bus-Off 增长
 
-优先检查物理 CAN：
+优先检查：
 
 ```text
 CANH/CANL
@@ -1545,32 +1524,23 @@ stub 长度
 
 ### 情况 5：UART CRC/header/length/tag error 增长
 
-这说明错误发生在：
+问题发生在：
 
 ```text
 HI92 -> STM32G431 UART
 ```
 
-还没到 CAN，更没到 EtherCAT。
-
-不要先调 SOEM。
+还没到 CAN，更没到 EtherCAT。不要先调 SOEM。
 
 ### 情况 6：sample sequence jumped，但 CAN diagnostics clean
-
-Master 日志：
 
 ```text
 6-IMU #N sample sequence jumped by ...
 ```
 
-而 CAN incomplete/FIFO 都正常：
+而 CAN incomplete/FIFO 都正常，说明 Slave 已经提交了完整样本，但 Master 没观察到每一份样本。
 
-```text
-Slave 已经正确提交了样本，
-但 Master 没观察到每一份样本。
-```
-
-检查：
+继续检查：
 
 ```text
 EtherCAT cycle
@@ -1578,7 +1548,66 @@ CPU isolation
 实时线程
 WKC/state warning
 Master CPU load
+RAW PDO GAP / ECAT LOOP STALL
 ```
+
+### 情况 7：出现 RAW PDO GAP
+
+日志类似：
+
+```text
+RAW PDO GAP: ... ms between ec_receive_processdata returns; wkc=... expected=...
+```
+
+它表示两次 `ec_receive_processdata` 返回之间的间隔已经达到当前 `sequenced_imu_period_us` 所定义的样本风险时间尺度。
+
+判断方法：
+
+```text
+WKC 同时异常
+→ 优先查 EtherCAT transport / NIC / slave state
+
+WKC 正常
+→ 继续结合 ECAT LOOP STALL 判断是不是主机调度/锁等待/抢占造成
+```
+
+### 情况 8：出现 ECAT LOOP STALL
+
+当前 Master 会把长周期拆成：
+
+```text
+scheduler_gap
+receive
+copy_in
+process_pdo
+process_lock_wait
+process_body
+process_body_cpu
+process_offcpu
+copy_out
+send
+unaccounted
+raw_pdo_gap
+WKC
+```
+
+重点看：
+
+```text
+scheduler_gap 大
+→ DATA realtime thread 没及时拿到 CPU 的可能性更高
+
+process_lock_wait 大
+→ slave mutex contention 的可能性更高
+
+process_body 很大，但 process_body_cpu 很小
+→ process_pdo 内被抢占/阻塞/off-CPU 的可能性更高
+
+process_body_cpu 本身很大
+→ 才更像实际 CPU 计算耗时
+```
+
+这个诊断比只看总 cycle time 更适合定位当前 Master 的偶发卡顿。
 
 ---
 
@@ -1597,7 +1626,7 @@ CAN2 = 3 IMU
 
 ```text
 6 个 IMU ROS topic 都持续存在
-6 个 IMU topic 都接近 500 Hz
+6 个 IMU topic 都稳定接近本次实际配置频率
 IMU 数据随传感器运动正常变化
 DJI RC /dji_rc 数据随遥控器操作正常变化
 DShot /dshot ROS 2 接口正常
@@ -1607,10 +1636,18 @@ CAN FIFO full 不持续增长
 CAN read error 不持续增长
 无持续 Bus-Off
 无持续 EtherCAT state/WKC 异常
+无持续 RAW PDO GAP / ECAT LOOP STALL
 Slave 稳定保持 OP
 ```
 
-如果只是在启动瞬间出现一次非持续 warning，不要立刻判定失败；关键是观察计数是否**持续增长**。
+如果本次明确按 500 Hz 验收，再额外确认：
+
+```text
+6 个 IMU topic 平均频率接近 500 Hz
+sequenced_imu_period_us = 2000 us
+```
+
+如果只是启动瞬间出现一次非持续 warning，不要立刻判定失败；关键是观察计数和告警是否**持续增长或持续重复**。
 
 ---
 
@@ -1680,6 +1717,14 @@ cd ~/ecat_ws/src/EcatV2_Master
   <NON_RT_CPUS>
 ```
 
+## 500 Hz timing diagnostic 时建议额外检查
+
+`bringup.launch.py`：
+
+```python
+'sequenced_imu_period_us': 2000,
+```
+
 ---
 
 # Part M：相关入口
@@ -1696,6 +1741,12 @@ https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006/web/
 
 https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006
 
+## H750 ProductCode 0x06 Releases
+
+https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/releases
+
+当前推荐：`v0.6.1`。
+
 ## 原版 AIMEtherCAT 教程
 
 - [Environment Setup（原版）](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/environment-setup.md)
@@ -1704,7 +1755,7 @@ https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006
 
 ## 压力测试
 
-[6-IMU / 500 Hz 压力测试计划（中英双语）](6imu-500hz-test-plan.md)
+[ProductCode 0x06 · 6-IMU 压力测试计划（中英双语）](6imu-500hz-test-plan.md)
 
 ## 配置生成器说明
 
@@ -1723,7 +1774,7 @@ EcatV2_Master 负责提供 soem_wrapper
 soem_bringup   负责你的 config + launch
 ```
 
-最终启动命令永远是：
+最终启动命令仍然是：
 
 ```bash
 ros2 launch soem_bringup bringup.launch.py
