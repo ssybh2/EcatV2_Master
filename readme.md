@@ -27,8 +27,8 @@
 
 | | |
 | --- | --- |
+| 📘 **[完整部署教程](https://github.com/ssybh2/EcatV2_Master/blob/feature/6imu-rc-dshot-pdo-v006/docs/6imu-deployment-beginner-cn.md)** | 📦 **[H750 Slave v0.6.1](https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/releases/tag/v0.6.1)** |
 | 🚀 **[进入当前部署分支](https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006)** | 🧩 **[打开在线 TaskEditor](https://ssybh2.github.io/EcatV2_Master/)** |
-| 📘 **[完整部署教程（小白版）](https://github.com/ssybh2/EcatV2_Master/blob/feature/6imu-rc-dshot-pdo-v006/docs/6imu-deployment-beginner-cn.md)** | 📦 **[H750 Slave v0.6.1](https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/releases/tag/v0.6.1)** |
 | 🧪 **[6-IMU 压力测试](https://github.com/ssybh2/EcatV2_Master/blob/feature/6imu-rc-dshot-pdo-v006/docs/6imu-500hz-test-plan.md)** | 🔧 **[HIPNUC G431 Firmware](https://github.com/ssybh2/hipnucimu/actions)** |
 
 ---
@@ -38,50 +38,13 @@
 <div align="center">
   <img src="docs/img/ZLT.png" alt="EcatV2 ProductCode 0x06 target drone" width="820">
   <br>
-  <sub><b>ProductCode 0x06 特种版目标飞行平台</b></sub>
+  <sub><b>Ethercat 特种版目标飞行平台</b></sub>
 </div>
 
 <br>
 
-这套 **ProductCode `0x06` 特种版** 是围绕上图无人机平台定制的 EtherCAT 主站配置。为了同时接入 **6 路 HIPNUC IMU、DJI RC / DBUS 与 DShot**，当前配置采用 **8-task profile**，并对过程数据空间进行了扩展：Application PDO 为 **80 B Master→Slave / 192 B Slave→Master**，用于容纳多路 IMU、诊断、遥控输入与执行器控制数据。
-
-因此这里的“特种版”不是单纯的界面命名，而是针对这架飞行器的传感器数量、任务数量和 PDO 需求形成的一套专用部署 profile。详细 offset、task、EEPROM / SII 与诊断字段统一放在部署文档中。
-
----
-
-## Quick Start
-
-### 1. 获取当前部署版本
-
-```bash
-git clone https://github.com/ssybh2/EcatV2_Master.git
-cd EcatV2_Master
-
-git checkout feature/6imu-rc-dshot-pdo-v006
-git submodule update --init --recursive
-```
-
-### 2. 生成本机 bringup
-
-```bash
-./tools/prepare_6imu_rc_dshot_bringup.sh \
-  <slave-serial> \
-  <ethercat-interface> \
-  <rt-cpu> \
-  <non-rt-cpus>
-```
-
-### 3. 编译并启动
-
-```bash
-source /opt/ros/humble/setup.bash
-colcon build
-source install/setup.bash
-
-ros2 launch soem_bringup bringup.launch.py
-```
-
-第一次部署建议不要从命令行片段直接跳着做，优先按照 **[完整部署教程](https://github.com/ssybh2/EcatV2_Master/blob/feature/6imu-rc-dshot-pdo-v006/docs/6imu-deployment-beginner-cn.md)** 从头执行。
+这套 **Ethercat 特种版** 为**张拉体无人机平台**定制的 EtherCAT 主站配置。
+同时接入 **6 路 HIPNUC IMU、DJI RC / DBUS 与 DShot**，当前配置采用 **8-task profile**，并对过程数据空间进行了扩展：Application PDO 为 **80 B Master→Slave / 192 B Slave→Master**，用于容纳多路 IMU、诊断、遥控输入与执行器控制数据。
 
 ---
 
