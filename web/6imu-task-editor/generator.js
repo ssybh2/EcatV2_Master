@@ -94,7 +94,7 @@
       dshot: {
         offset: DSHOT_OFFSET,
         connectionLostAction: 2,
-        dshotId: 1,
+        dshotId: 2,
         initValue: 0,
         topic: '/dshot',
       },
