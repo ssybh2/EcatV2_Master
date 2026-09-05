@@ -100,13 +100,21 @@ sdo_len = 91
 task_count = 8
 ```
 
-DShot 推荐安全默认值：
+DShot 安全配置：
 
 ```text
 connection_lost_write_action = 2
-dshot_id = 1
 init_value = 0
 ```
+
+`dshot_id` 是实际硬件端口选择，不是逻辑通道号。H750 从站当前实现中：
+
+```text
+dshot_id = 1  -> TIM3 / DSHOT1
+dshot_id = 2  -> TIM2 / DSHOT2
+```
+
+ZLT 旧版已经验证可工作的 `app4/write` 使用 `dshot_id = 2`，因此 ZLT 当前 0x06 配置继续使用 `2`，避免升级 6-IMU profile 时把物理输出从 DSHOT2 静默切到 DSHOT1。如果硬件确实接在 DSHOT1，则应显式改为 `1`。
 
 通用模板：`src/soem_wrapper/config/config_6imu_rc_dshot_template.yaml`
 
