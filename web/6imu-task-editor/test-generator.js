@@ -27,7 +27,7 @@ const yaml = C.generateConfigYaml([m]);
   '- app_8:',
   'sdowrite_task_type: !uint8_t 4',
   'sdowrite_connection_lost_write_action: !uint8_t 2',
-  'sdowrite_dshot_id: !uint8_t 1',
+  'sdowrite_dshot_id: !uint8_t 2',
   'sdowrite_init_value: !uint16_t 0',
   'pdowrite_offset: !uint16_t 0',
   "sub_topic: !std::string '/dshot'",
