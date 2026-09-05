@@ -1,84 +1,145 @@
-# EcatV2 Master — ProductCode 0x06：6IMU + DJI RC + DShot
+# EcatV2 Master
 
-当前真机验证分支：`feature/6imu-rc-dshot-pdo-v006`。
+### ProductCode 0x06 · 6 IMU · DJI RC · DShot
 
-## 当前 Profile
+> 面向 **STM32H750 + AX58100** EtherCAT 从站的 ROS 2 / SOEM Master。
+> 当前版本整合 6 路 HIPNUC IMU、DJI RC / DBUS 输入与 DShot 输出，并提供网页配置工具、部署脚本和运行诊断。
 
-| 项目 | 值 |
-|---|---:|
-| ProductCode / eepid | `0x00000006` |
-| M→S application PDO | `80 B` |
-| S→M application PDO | `192 B` |
-| EtherCAT Outputs | `81 B / 648 bit` |
-| EtherCAT Inputs | `193 B / 1544 bit` |
-| task_count | `8` |
-| sdo_len | `91 B` |
+**当前推荐分支：** `feature/6imu-rc-dshot-pdo-v006`
 
-S→M：`0..125` 六个 IMU，`126..159` diagnostics，`160..178` DJI RC（18 B DBUS + 1 B online），`179..191` reserved。
+---
 
-M→S：`0..7` DShot（4 × uint16），`8..79` reserved。
+## 当前版本
 
-## 真机验证
+| 项目 | 当前配置 |
+| --- | --- |
+| EtherCAT Profile | `ProductCode 0x00000006` |
+| Application PDO | Master → Slave `80 B` · Slave → Master `192 B` |
+| 功能 | 6 × IMU · DJI RC / DBUS · DShot |
+| 实机状态 | STM32H750 + AX58100 已进入 OP，6-IMU 链路已运行 |
 
-已在 STM32H750 + AX58100 上验证：
+更详细的 PDO offset、task 配置、EEPROM / SII 和诊断字段不在首页展开，统一放在部署文档中。
 
-```text
-Product Code     : 00000006
-Checksum         : 009C
-calculated       : 009C
-Output size      : 648 bits
-Input size       : 1544 bits
-SM2              : 81 B
-SM3              : 193 B
-SAFE_OP          : State 4
-Master           : reached OP
-```
+---
 
-Master 已稳定进入数据循环。6-IMU 已运行；DJI RC / DShot 已完成软件集成，实际遥控器/执行器功能仍应按安全条件分别测试。
-
-## 8-task TaskEditor
-
-- 在线：<https://ssybh2.github.io/EcatV2_Master/>
-- 源码：`web/6imu-task-editor/`
-- 文档：`docs/6imu-task-editor.md`
-
-Editor 现在生成 `0x06 / task_count=8 / sdo_len=91`，包含 Task 7 DJI RC 和 Task 8 DShot。
-
-## 配置
-
-通用模板：
+## 系统结构
 
 ```text
-src/soem_wrapper/config/config_6imu_rc_dshot_template.yaml
+6 × HIPNUC IMU
+      │
+      │ CAN1 / CAN2
+      ▼
+STM32H750 + AX58100
+      │
+      │ EtherCAT
+      ▼
+EcatV2 Master / SOEM
+      │
+      ▼
+     ROS 2
+      │
+      ├── 6 × IMU topics
+      ├── DJI RC / DBUS
+      └── DShot
 ```
 
-创建本机 bringup：
+---
+
+## 快速开始
+
+### 1. 使用当前分支
 
 ```bash
-./tools/prepare_6imu_rc_dshot_bringup.sh <serial> <interface> <rt-cpu> <non-rt-cpus>
+git checkout feature/6imu-rc-dshot-pdo-v006
+git submodule update --init --recursive
 ```
 
-本机 `src/soem_bringup/` 含真实 Serial/NIC/CPU，已加入 `.gitignore`，不要作为公共模板提交。
+### 2. 生成本机 bringup
 
-## EEPROM / SII
+```bash
+./tools/prepare_6imu_rc_dshot_bringup.sh \
+  <slave-serial> \
+  <ethercat-interface> \
+  <rt-cpu> \
+  <non-rt-cpus>
+```
 
-当前已验证的 2048-byte AX58100 SII 不含静态 RxPDO / TxPDO category；实际 PDO mapping 与 SM 长度由 H750 上 SOES 的 CoE object dictionary 动态提供。
+脚本会根据当前 ProductCode 0x06 模板创建本机 `soem_bringup` 配置。
 
-0x06 镜像由已知可工作的 0x05 EEPROM 复制而来，只修改 SII ProductCode 字段（byte offset `0x14`：`0x05 → 0x06`）。实际写入、读回和断电重启后已验证 ProductCode 0x06、checksum 一致、81 B / 193 B PDO。
+### 3. 编译并启动
 
-详见 `docs/6imu-dji-rc-dshot-deployment-cn.md`。
+```bash
+source /opt/ros/humble/setup.bash
+colcon build
+source install/setup.bash
+
+ros2 launch soem_bringup bringup.launch.py
+```
+
+---
+
+## TaskEditor
+
+不想手动编辑 YAML 时，可以直接使用在线配置工具：
+
+### [Open ProductCode 0x06 TaskEditor](https://ssybh2.github.io/EcatV2_Master/)
+
+可以配置 Slave Serial、6 个 IMU topic / frame、DJI RC topic 以及 DShot 参数，并直接生成 `config.yaml`。
+
+源码位于：`web/6imu-task-editor/`
+
+---
+
+## 文档入口
+
+第一次部署建议直接从完整教程开始：
+
+- **[完整部署教程（小白版）](docs/6imu-deployment-beginner-cn.md)** — 从 Ubuntu 环境、固件烧录到 ROS 2 验收
+- **[ProductCode 0x06 部署说明](docs/6imu-dji-rc-dshot-deployment-cn.md)** — PDO、EEPROM / SII 与当前实机基线
+- **[TaskEditor 说明](docs/6imu-task-editor.md)** — 8-task 配置生成器
+- **[6-IMU 压力测试计划](docs/6imu-500hz-test-plan.md)** — 多 IMU、诊断与稳定性验证
+
+---
+
+## 配套固件
+
+| 模块 | 推荐版本 |
+| --- | --- |
+| Master | `ssybh2/EcatV2_Master` · `feature/6imu-rc-dshot-pdo-v006` |
+| H750 + AX58100 Slave | `ssybh2/EcatV2_AX58100_H750_Universal` · `feature/6imu-rc-dshot-pdo-v006` · Release `v0.6.1` |
+| HIPNUC G431 bridge | `ssybh2/hipnucimu` · `feature/6imu-500hz-stable` |
+
+> Master、Slave、EEPROM 和配置文件必须使用同一套 ProductCode 0x06 profile。
+
+---
+
+## 当前状态
+
+- ✅ ProductCode 0x06 EtherCAT profile
+- ✅ 6 × HIPNUC IMU
+- ✅ DJI RC / DBUS 软件链路
+- ✅ DShot 软件链路
+- ✅ 在线 TaskEditor
+- ✅ RAW PDO GAP / EtherCAT loop stall diagnostics
+- ✅ STM32H750 + AX58100 SAFE_OP / OP 实机验证
+
+DJI RC 和 DShot 的最终实机功能测试仍应按具体硬件和安全条件分别完成。
+
+---
 
 ## Legacy
 
-ProductCode `0x05`（80/160 B、6 个纯 IMU task、sdo_len 85）继续保留为 legacy profile，不要与 0x06 配置混用。
+旧 ProductCode `0x05` / 160 B S→M profile 仍保留用于历史兼容，但**不要与当前 0x06 配置混用**。
 
-## DShot 安全
+---
 
-首次 DShot 实机验证建议卸下桨叶/脱离负载并准备断电。默认：
+## Safety
 
-```text
-connection_lost_write_action = 2
-dshot_id = 1
-init_value = 0
-pdowrite_offset = 0
-```
+首次进行 DShot 实机测试时，请先卸下桨叶或解除机械负载，并准备可靠的断电方式。
+
+---
+
+### Related repositories
+
+- [H750 + AX58100 Slave](https://github.com/ssybh2/EcatV2_AX58100_H750_Universal)
+- [HIPNUC IMU Forward Bridge](https://github.com/ssybh2/hipnucimu)
