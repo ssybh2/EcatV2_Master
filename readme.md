@@ -1,8 +1,8 @@
 <div align="center">
 
-# EcatV2 Master
+# EcatV2 Master（特种版）
 
-**ROS 2 + SOEM EtherCAT Master for robotics**
+**ROS 2 + SOEM EtherCAT Master for Drones**
 
 <p>
   <img alt="ProductCode" src="https://img.shields.io/badge/ProductCode-0x06-0969da?style=flat-square">
@@ -23,7 +23,7 @@
 
 ---
 
-## 快速入口
+## Quick Start 快速入口
 
 | | |
 | --- | --- |
@@ -38,7 +38,7 @@
 当前 ProductCode `0x06` profile 面向这一套完整链路：
 
 ```text
-6 × HIPNUC IMU
+6 × HIPNUC IMU + DJIRC +Dshot
       │
       │ CAN1 / CAN2
       ▼
