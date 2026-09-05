@@ -35,28 +35,17 @@
 
 ## 当前系统
 
-当前 ProductCode `0x06` profile 面向这一套完整链路：
+<div align="center">
+  <img src="docs/img/ecatv2_special_drone.jpg" alt="EcatV2 ProductCode 0x06 target drone" width="820">
+  <br>
+  <sub><b>ProductCode 0x06 特种版目标飞行平台</b></sub>
+</div>
 
-```text
-6 × HIPNUC IMU + DJIRC +Dshot
-      │
-      │ CAN1 / CAN2
-      ▼
-STM32H750 + AX58100
-      │
-      │ EtherCAT
-      ▼
-EcatV2 Master / SOEM
-      │
-      ▼
-     ROS 2
-      │
-      ├── 6 × IMU topics
-      ├── DJI RC / DBUS
-      └── DShot
-```
+<br>
 
-首页只保留最关键的信息：当前 profile 为 **ProductCode 0x06**，Application PDO 为 **80 B Master→Slave / 192 B Slave→Master**。详细 offset、task、EEPROM / SII 与诊断字段统一放在部署文档中。
+这套 **ProductCode `0x06` 特种版** 是围绕上图无人机平台定制的 EtherCAT 主站配置。为了同时接入 **6 路 HIPNUC IMU、DJI RC / DBUS 与 DShot**，当前配置采用 **8-task profile**，并对过程数据空间进行了扩展：Application PDO 为 **80 B Master→Slave / 192 B Slave→Master**，用于容纳多路 IMU、诊断、遥控输入与执行器控制数据。
+
+因此这里的“特种版”不是单纯的界面命名，而是针对这架飞行器的传感器数量、任务数量和 PDO 需求形成的一套专用部署 profile。详细 offset、task、EEPROM / SII 与诊断字段统一放在部署文档中。
 
 ---
 
