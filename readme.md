@@ -36,7 +36,7 @@
 ## 当前系统
 
 <div align="center">
-  <img src="docs/img/ecatv2_special_drone.jpg" alt="EcatV2 ProductCode 0x06 target drone" width="820">
+  <img src="docs/img/ZLT.png" alt="EcatV2 ProductCode 0x06 target drone" width="820">
   <br>
   <sub><b>ProductCode 0x06 特种版目标飞行平台</b></sub>
 </div>
