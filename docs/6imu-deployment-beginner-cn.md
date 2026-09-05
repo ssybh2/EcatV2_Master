@@ -386,7 +386,7 @@ rosdep install --from-paths src --ignore-src -r -y
 
 打开：
 
-https://github.com/ssybh2/hipnucimu/actions
+[打开 HIPNUC Firmware Actions 页面](https://github.com/ssybh2/hipnucimu/actions)
 
 选择 `feature/6imu-500hz-stable` 上最新一次绿色的：
 
@@ -572,9 +572,7 @@ verified ... bytes
 
 当前正式部署优先使用最新 ProductCode 0x06 Release：
 
-```text
-https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/releases
-```
+[打开 v0.6.1 Release 下载页面](https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/releases/tag/v0.6.1)
 
 当前推荐：
 
@@ -606,9 +604,7 @@ Sample N+1 sequence
 
 如果需要最新开发构建，也可以打开：
 
-```text
-https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/actions
-```
+[打开当前分支的 H750 Actions 构建页面](https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/actions/workflows/build.yml?query=branch%3Afeature%2F6imu-rc-dshot-pdo-v006)
 
 选择当前 `feature/6imu-rc-dshot-pdo-v006` 分支的 `Build ProductCode 0x06 Slave Firmware`，下载 Actions artifact。
 
@@ -1060,11 +1056,11 @@ Found slave id=1, sn=2883658, eepid=6, type=H750UniversalModule (6-IMU + RC + DS
 
 在线网页：
 
-https://ssybh2.github.io/EcatV2_Master/
+[打开 ProductCode 0x06 TaskEditor](https://ssybh2.github.io/EcatV2_Master/)
 
 源码：
 
-https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006/web/6imu-task-editor
+[查看 TaskEditor 源码](https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006/web/6imu-task-editor)
 
 当前 TaskEditor 已经是两页式界面：
 
@@ -1731,19 +1727,19 @@ cd ~/ecat_ws/src/EcatV2_Master
 
 ## ProductCode 0x06 · 8-task TaskEditor
 
-https://ssybh2.github.io/EcatV2_Master/
+[打开 ProductCode 0x06 TaskEditor](https://ssybh2.github.io/EcatV2_Master/)
 
 ## TaskEditor 源码
 
-https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006/web/6imu-task-editor
+[查看 TaskEditor 源码](https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006/web/6imu-task-editor)
 
 ## Master 分支
 
-https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006
+[打开 Master feature/6imu-rc-dshot-pdo-v006 分支](https://github.com/ssybh2/EcatV2_Master/tree/feature/6imu-rc-dshot-pdo-v006)
 
 ## H750 ProductCode 0x06 Releases
 
-https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/releases
+[打开 v0.6.1 Release 下载页面](https://github.com/ssybh2/EcatV2_AX58100_H750_Universal/releases/tag/v0.6.1)
 
 当前推荐：`v0.6.1`。
 
