@@ -20,7 +20,7 @@ This is the course entry point for students who are new to Linux, the Ubuntu ter
 
 The teaching branch is based on [AIMEtherCAT/EcatV2_Master](https://github.com/AIMEtherCAT/EcatV2_Master), an EtherCAT master project built around **ROS 2** and **SOEM (Simple Open EtherCAT Master)**. This branch focuses on **beginner-friendly deployment and course exercises**; it is not a replacement for the upstream project's technical documentation.
 
-> **Documentation status:** The three course chapters below have been created as navigation pages only. Their step-by-step instructions are intentionally blank and will be written after the course content is agreed upon.
+> **Documentation status:** Environment Setup now links to two subpages. The first contains a preliminary **Chinese-language** guide to BIOS, Ubuntu, realtime kernel, and CPU isolation, pending hardware verification. The second, beginning at **Setup ROS2 Workspace**, remains blank. First Run Test and Customize configuration are also still blank.
 
 ## Course roadmap
 
@@ -32,7 +32,7 @@ Start with Chapter 01 and proceed in order. You do **not** need prior EtherCAT e
 | **02** | **[First Run Test →](docs/teaching-class/first-run-test.md)** | Starting the system and checking basic EtherCAT communication between the master and slave devices. |
 | **03** | **[Customize configuration →](docs/teaching-class/customize-configuration.md)** | Understanding and adapting the configuration to your own hardware and control tasks. |
 
-**The chapter links work, but the chapters intentionally contain only their titles for now.**
+**Environment Setup is now divided into two linked parts; Part 1 is a Chinese draft, while Part 2 and the other course chapters have no instructions yet.**
 
 ## Who is this guide for?
 
@@ -71,7 +71,7 @@ Data exchange for control experiments
 | `src/custom_msgs/` | Project-specific ROS 2 message definitions. |
 | `eeproms/` | EEPROM-related files for slave devices. |
 | `tools/` | Auxiliary EtherCAT utilities. |
-| `docs/teaching-class/` | Three dedicated course chapters (currently empty). |
+| `docs/teaching-class/` | Course pages; Environment Setup contains a two-part navigation and an initial Chinese guide. |
 
 ## Before you begin
 
