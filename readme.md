@@ -16,11 +16,10 @@
 
 本教程专为 **航空航天专业Salman-2003-控制课程** 的同学编写，尤其适合第一次接触 **Linux、Ubuntu 终端、ROS 2 或 EtherCAT** 的初学者。
 
-我们的目标不是要求你提前掌握所有知识，而是按照清晰的顺序，逐步完成 **开发环境准备 → 首次 EtherCAT 通信测试 → 根据自己的设备自定义配置**。
+我们的目标不是要求你提前掌握所有知识，而是按照清晰的顺序，在短时间内逐步完成 **开发环境准备 → 首次 EtherCAT 通信测试 → 根据自己的设备自定义配置**。
 
 本教学分支基于 **[AIMEtherCAT / EcatV2_Master](https://github.com/AIMEtherCAT/EcatV2_Master)** 开发。特别感谢 **[Control System Lab（UNNC）](https://github.com/ControlSystemLab-UNNC)** 的支持，以及原项目贡献者 **[hangx05](https://github.com/AIMEtherCAT/EcatV2_Master/commits?author=hangx05)** 的工作与贡献。
 
-> **文档进度：** 下方三个课程章节已创建并可点击。按照课程安排，**目前只保留章节标题，暂不编写具体操作内容**；后续确定教学步骤后再逐章完善。
 
 ## 课程导航
 
