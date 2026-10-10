@@ -31,7 +31,7 @@
 | **02** | **[First Run Test →](docs/teaching-class/first-run-test.md)** | 首次启动系统，检查主站与从站之间的基本 EtherCAT 通信。 |
 | **03** | **[Customize configuration →](docs/teaching-class/customize-configuration.md)** | 认识配置文件，并逐步适配自己的硬件和控制任务。 |
 
-**提示：** 以上链接均指向课程专用页面，当前页面内**只有标题，没有教程正文**。
+**提示：** **Environment Setup** 已拆分为两个子页面：第一部分已提供中文教学草稿（具体电脑参数待确认），第二部分从 **Setup ROS2 Workspace** 开始，暂时只保留标题。**First Run Test** 与 **Customize configuration** 仍留空，待后续共同完善。
 
 ## EtherCAT 是什么？与本项目有什么关系？
 
