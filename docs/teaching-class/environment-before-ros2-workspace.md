@@ -40,33 +40,30 @@ BIOS/UEFI 是操作系统启动前的硬件设置界面。不同品牌、不同�
 
 ### 2.1 选择系统版本
 
-- **推荐**：[Ubuntu 24.04 LTS Desktop](https://ubuntu.com/download/desktop) + [ROS 2 Jazzy](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)。
-- **备选**：Ubuntu 22.04 LTS + ROS 2 Humble（需根据课程安排确认）。
-- 本教程面向真实 EtherCAT 硬件通信，优先使用**物理机原生 Ubuntu**，不建议初次测试就使用 Windows 虚拟机作为实时主站。
+- **推荐**：Ubuntu 22.04 LTS + ROS 2 Humble
+- **备选**：[Ubuntu 24.04 LTS Desktop](https://ubuntu.com/download/desktop) + [ROS 2 Jazzy](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)。
+
+-本项目不提倡使用Windows或者macos安装的虚拟机进行操作，支持纯血Linux系统，减少因为架构、引导程序不兼容引起的bug.
 
 ### 2.2 安装步骤概览
 
-1. 备份笔记本中的重要资料，确认是否需要保留 Windows。
-2. 从 Ubuntu 官网下载对应的 ISO 镜像，并制作 USB 启动盘。
-3. 从 USB 启动，按安装向导安装 Ubuntu；如果采用双系统，请仔细核对分区，避免覆盖现有数据。
-4. 安装完成后联网并打开终端：按 `Ctrl + Alt + T`。
-5. 更新已安装软件：
+1. 更新已安装软件：
 
 ```bash
 sudo apt update
 sudo apt upgrade -y
 ```
 
-**终端入门：** `sudo` 表示以管理员权限执行命令；输入密码时通常不会显示字符，这属于正常现象。
 
-> ROS 2 Jazzy 的正式安装命令可参考上面的 ROS 2 官方链接。本篇先完成操作系统和实时环境的准备，不在这里创建 ROS 2 工作空间；工作空间建立将在**第二部分**开始。
+**终端入门：** `sudo` 表示以管理员权限执行命令；输入密码时通常不会显示字符，这属于正常现象。
+电脑密码默认为阿拉伯数字 “1”
 
 ## 3. Ubuntu Pro（关联账号）
 
 原始教程使用 Ubuntu Pro 提供的实时内核安装方式。
 
 1. 在 [Ubuntu One](https://login.ubuntu.com/) 注册或登录账号。
-2. 安装完 Ubuntu 后，在终端执行：
+2. 安装完 Ubuntu 后，在终端执行：（按下Ctrl+Alt+T打开终端)
 
 ```bash
 sudo pro attach
@@ -76,19 +73,11 @@ sudo pro attach
 
 ![Ubuntu Pro 绑定示例（来源：原始仓库）](../img/pro-attach.png)
 
-检查状态：
-
-```bash
-pro status
-```
-
-> 如果 `pro` 命令不存在，先确认 Ubuntu 版本及 `ubuntu-pro-client` 软件包是否安装。Ubuntu Pro 的订阅规则和服务状态以 [Ubuntu 官方说明](https://ubuntu.com/pro) 为准。
-
 ## 4. Enable Realtime-Kernel（启用实时内核）
 
 ### 4.1 为什么需要实时内核？
 
-普通 Linux 主要考虑整体吞吐量与交互体验。**PREEMPT_RT 实时内核**可以改善任务调度延迟和抖动的可预测性，对周期性的 EtherCAT 控制任务有帮助，但它**不能单独保证**端到端通信的严格实时性。
+普通 Linux 主要考虑整体吞吐量与交互体验。**PREEMPT_RT 实时内核**可以改善任务调度延迟和抖动的可预测性，对周期性的 EtherCAT 控制任务有帮助。
 
 完成 Ubuntu Pro 关联后，执行：
 
@@ -128,9 +117,7 @@ grep '^CONFIG_PREEMPT_RT=' /boot/config-$(uname -r)
 
 ### 5.1 什么是 CPU 隔离？
 
-为了尽量减少其他程序干扰，可以把一部分逻辑 CPU 保留给高优先级的 EtherCAT/SOEM 任务。
-
-**这是后续可选的性能优化，不是确认 Ubuntu 和 ROS 2 安装成功的前提。** 如果刚开始学习，建议先完成系统及实时内核验证，再处理这一节。
+为了尽量减少其他程序干扰，可以把一部分逻辑 CPU 保留给高优先级的 EtherCAT/SOEM 任务，简单理解为专门腾出来一个CPU的核心给Ethercat跑任务，其他任务不和它争抢CPU。
 
 ### 5.2 首先查清 CPU 编号
 
