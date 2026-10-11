@@ -16,6 +16,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
         "msg/ReadSBUSRC.msg"
 
         "msg/WriteDSHOT.msg"
+        "msg/ReadDSHOTRpm.msg"
 
         "msg/WriteDJIMotor.msg"
         "msg/ReadDJIMotor.msg"
