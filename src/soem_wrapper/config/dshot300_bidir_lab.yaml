@@ -1,0 +1,22 @@
+# BENCH ONLY. Use only with STM32H750 firmware compiled
+# with -DAIM_DSHOT_RPM_LAB_RX=ON; DO NOT FLY.
+# Original config.yaml is deliberately left untouched.
+# Slave SN here is the identifier previously used in this project.
+slaves:
+  - sn4653120:
+      sdo_len: !uint16_t 8
+      task_count: !uint8_t 2
+      latency_pub_topic: !std::string '/ecat/sn4653120/latency'
+      tasks:
+        - app_1:
+            sdowrite_task_type: !uint8_t 17  # independent DShot300 bidir TX
+            sdowrite_connection_lost_write_action: !uint8_t 0x02
+            sub_topic: !std::string '/ecat/sn4653120/app1/write'
+            pdowrite_offset: !uint16_t 0
+            sdowrite_dshot_id: !uint8_t 2
+            sdowrite_init_value: !uint16_t 0
+        - app_2:
+            sdowrite_task_type: !uint8_t 16  # existing RPM read-only PDO
+            sdowrite_dshot_id: !uint8_t 2
+            pdoread_offset: !uint16_t 0
+            pub_topic: !std::string '/ecat/sn4653120/app2/rpm'
