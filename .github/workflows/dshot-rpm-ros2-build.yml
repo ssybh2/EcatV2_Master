@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/dshot600-esc-rpm-telemetry
+      - feature/dshot300-bidir-rpm
   pull_request:
     paths:
       - 'src/custom_msgs/**'
