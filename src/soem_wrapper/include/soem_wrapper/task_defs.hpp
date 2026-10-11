@@ -15,6 +15,7 @@
 #include "custom_msgs/msg/read_dm_motor.hpp"
 #include "custom_msgs/msg/write_dshot.hpp"
 #include "custom_msgs/msg/read_dshot_rpm.hpp"
+#include "custom_msgs/msg/read_dshot_rpm_diag.hpp"
 #include "custom_msgs/msg/write_lk_motor_openloop_control.hpp"
 #include "custom_msgs/msg/write_lk_motor_speed_control_with_torque_limit.hpp"
 #include "custom_msgs/msg/write_lk_motor_torque_control.hpp"
@@ -59,7 +60,8 @@ namespace aim::ecat::task {
     constexpr uint8_t VT13_RC_APP_ID = 14;
     constexpr uint8_t DD_MOTOR_APP_ID = 15;
     constexpr uint8_t DSHOT_RPM_APP_ID = 16;
-    constexpr uint8_t DSHOT300_BIDIR_APP_ID = 17; // opt-in STM32H750 lab receiver
+    constexpr uint8_t DSHOT300_BIDIR_APP_ID = 17;
+    constexpr uint8_t DSHOT_RPM_DIAG_APP_ID = 18; // opt-in STM32H750 lab receiver
 
     class TaskWrapper {
         uint8_t type_id_ = 0;
@@ -261,6 +263,17 @@ namespace aim::ecat::task {
             uint8_t dshot_id_{0};
         public:
             DSHOT_RPM() : TaskWrapper(DSHOT_RPM_APP_ID, "DSHOT_RPM", true, false) {}
+            void init_sdo(uint8_t *buf, int *offset, uint16_t slave_id, const std::string &prefix) override;
+            void read() override;
+            void publish_empty_message() override;
+            void cleanup() override { publisher_.reset(); }
+        };
+
+        class DSHOT_RPM_DIAG final : public TaskWrapper {
+            rclcpp::Publisher<custom_msgs::msg::ReadDSHOTRpmDiag>::SharedPtr publisher_{};
+            uint8_t dshot_id_{0};
+        public:
+            DSHOT_RPM_DIAG() : TaskWrapper(DSHOT_RPM_DIAG_APP_ID, "DSHOT_RPM_DIAG", true, false) {}
             void init_sdo(uint8_t *buf, int *offset, uint16_t slave_id, const std::string &prefix) override;
             void read() override;
             void publish_empty_message() override;
