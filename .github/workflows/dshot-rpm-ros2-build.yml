@@ -1,0 +1,29 @@
+name: DShot RPM ROS2 Humble build
+on:
+  push:
+    branches:
+      - feature/dshot600-esc-rpm-telemetry
+  pull_request:
+    paths:
+      - 'src/custom_msgs/**'
+      - 'src/soem_wrapper/**'
+      - '.github/workflows/dshot-rpm-ros2-build.yml'
+jobs:
+  compile-ros2:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ROS 2 Humble
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: humble
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-colcon-common-extensions libfmt-dev libyaml-cpp-dev
+      - name: Build EtherCAT RPM message and backend
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --packages-select custom_msgs soem soem_wrapper \
+            --event-handlers console_direct+
