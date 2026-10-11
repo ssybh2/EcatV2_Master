@@ -217,6 +217,10 @@ namespace aim::ecat {
                     task_wrapper = std::make_unique<task::pwm::DSHOT>();
                     break;
                 }
+                case task::DSHOT_RPM_APP_ID: {
+                    task_wrapper = std::make_unique<task::pwm::DSHOT_RPM>();
+                    break;
+                }
                 case task::DJICAN_APP_ID: {
                     task_wrapper = std::make_unique<task::dji_motor::DJI_MOTOR>();
                     break;
