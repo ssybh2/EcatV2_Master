@@ -41,6 +41,7 @@ add_executable(soem_backend
         src/tasks/dji_rc.cpp
         src/tasks/dm_motor.cpp
         src/tasks/dshot.cpp
+        src/tasks/dshot_rpm.cpp
         src/tasks/hipnuc_imu_can.cpp
         src/tasks/ms5837_30ba.cpp
         src/tasks/external_pwm.cpp
