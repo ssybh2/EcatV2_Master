@@ -59,6 +59,7 @@ namespace aim::ecat::task {
     constexpr uint8_t VT13_RC_APP_ID = 14;
     constexpr uint8_t DD_MOTOR_APP_ID = 15;
     constexpr uint8_t DSHOT_RPM_APP_ID = 16;
+    constexpr uint8_t DSHOT300_BIDIR_APP_ID = 17; // opt-in STM32H750 lab receiver
 
     class TaskWrapper {
         uint8_t type_id_ = 0;
@@ -274,7 +275,8 @@ namespace aim::ecat::task {
             void on_command(custom_msgs::msg::WriteDSHOT::SharedPtr msg) const;
 
         public:
-            DSHOT() : TaskWrapper(DSHOT_APP_ID, "DSHOT", false, true) {
+            explicit DSHOT(const uint8_t app_id = DSHOT_APP_ID) : TaskWrapper(app_id,
+                app_id == DSHOT300_BIDIR_APP_ID ? "DSHOT300_BIDIR" : "DSHOT", false, true) {
             }
 
             void cleanup() override {
