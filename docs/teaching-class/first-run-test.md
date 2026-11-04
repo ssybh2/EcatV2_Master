@@ -2,22 +2,6 @@
 
 [← 上一篇：Setup ROS2 Workspace 与后续部署](setup-ros2-workspace-and-after.md) · [返回课程主页](../../readme.md)
 
-> **教学依据**：[AIMEtherCAT / EcatV2_Master 原版 First Run Tutorial](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/first-run-test.md)。本篇按原版 **Create Bringup Package → Config File → Launch File → Do First-run test → Done** 的顺序编写，保留原始命令、完整示例配置及原版两张图片；额外加入初学者操作说明和错误排查。**实际网卡名称、CPU 编号和从站序列号必须以各自电脑、硬件为准。**
-
-## 本节学习目标
-
-完成[上一部分](setup-ros2-workspace-and-after.md)的工作空间配置和 EtherCAT 模块准备后，本节将带你：
-
-1. 新建 ROS 2 启动包 `soem_bringup`，创建 `config` 和 `launch` 两个目录；
-2. 添加 `config.yaml` 与 `bringup.launch.py`；
-3. 使用 `colcon build` 编译，并以 root 权限启动 SOEM 主站；
-4. 从日志中寻找真实的 EtherCAT 从站 SN（序列号）；
-5. 确认 `slave id ... confirmed ready`，查看 `/latency` 通信延迟。
-
-**运行前准备：** 已在原生 Ubuntu 中安装匹配的 ROS 2，工作空间包含 `src/EcatV2_Master`；EtherCAT 从站正常供电，电脑的 EtherCAT 网线接入从站 **IN** 口。本课沿用示例工作空间 `~/ethercat_ws`。
-
----
-
 ## 1. Create Bringup Package（创建 ROS 2 启动包）
 
 ### 步骤 1：进入 src 目录
@@ -26,23 +10,20 @@
 
 ~~~bash
 cd ~/ethercat_ws/src
-pwd
 ls
 ~~~
 
-`cd` 用于进入指定目录；`pwd` 显示当前路径；`ls` 列出当前文件夹内容。你应该能看到之前添加的 `EcatV2_Master`。
+`cd` 用于进入指定目录；`ls` 列出当前文件夹内容。你应该能看到之前添加的 `EcatV2_Master`。
 
 ### 步骤 2：创建 soem_bringup 包
 
-在 `src` 内执行原教程命令：
+在 `src` 内执行命令：
 
 ~~~bash
 ros2 pkg create --build-type ament_cmake soem_bringup
 ~~~
 
 它的含义是：使用 `ament_cmake` 构建类型，创建名称为 `soem_bringup` 的 ROS 2 功能包。成功后，`src` 中会出现 `soem_bringup` 文件夹。
-
-> 如果显示 `ros2: command not found`，需要先检查 ROS 2 是否正确安装并在当前终端加载；如果 `soem_bringup` 已存在，不要重复创建覆盖文件。
 
 ### 步骤 3：创建 config 与 launch 文件夹
 
@@ -56,11 +37,7 @@ mkdir -p config launch
 
 ### 步骤 4：修改 CMakeLists.txt
 
-在当前的 `soem_bringup` 目录执行：
-
-~~~bash
-nano CMakeLists.txt
-~~~
+点开屏幕最左边靠上位置的files文件夹
 
 按原教程加入以下内容：
 
