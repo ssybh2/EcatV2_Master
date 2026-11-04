@@ -139,6 +139,11 @@ cd ../..
 cd ../../..
 ~~~
 相当于按下了3次返回按键。<br>
+同样你也可以直接在任意路径下运行以下指令直接回到ethercat_ws的根目录：
+~~~bash
+cd ~/ethercat_ws
+~~~
+一样的效果，不同的方式罢了。<br>
 之后我们回到正题。
 ### 步骤 2：找到 tools 和 eeproms
 
@@ -152,27 +157,31 @@ cd ../../..
 ![tools-tree.png：原版教程的 tools 和 eeproms 目录图](../img/tools-tree.png)
 
 <sub>原版图片 `docs/img/tools-tree.png`；当前教学仓库复用相同文件。</sub>
+步骤二只是为了告诉大家在src/EcatV2_Master/eeproms这个路径下面有2个很重要的.bin文件，这2个.bin文件我们后续会用到，它的作用是给你手上的Ethercat板子刷写设备id，也就是给板子起一个名字。大概率是叫sn12345678 诸如此类的数字名字。<br>
+因此可以直接快进到步骤三。
 
 ### 步骤 3：切换 root 并赋予执行权限
 
-原教程首先执行：
+首先在ethercat_ws根目录执行：
 
 ~~~bash
 sudo su
 ~~~
-
+之后它会提示让你输入密码，这里密码默认都是阿拉伯数字 “1” 。但是你会发现你按下键盘之后屏幕上没有显示数字1或者任何东西，这是正常的，linux是不会把密码直接显示在屏幕上的。<br>
+因此你只需要在系统提示让你输入密码之后按下1，之后再按下回车（enter）就行。之后你会发现原本蓝绿色的终端字母变成了灰白色。并且最前面多了root几个字母。这说明是对的，root权限是最高权限。<br>
 然后执行：
 
 ~~~bash
 chmod +x src/EcatV2_Master/tools/*
 ~~~
 
-`sudo su` 会切换到 root Shell；`chmod +x` 为工具增加可执行权限。
+`chmod +x` 的作用是为工具tools增加可执行权限。
 
-**必须注意**：即使切换为 root，也应从工作空间根目录执行相对路径命令。如果当前目录不对，请先返回工作空间根目录。完成操作后可使用 `exit` 退出 root Shell。
+**必须注意**：即使切换为 root，也应从工作空间根目录执行相对路径命令。如果当前目录不对，请先返回工作空间根目录。<br>
 
 ### 步骤 3：选择与你的硬件匹配的 EEPROM 文件
-
+## Tips 1：
+请使用一根type C线给你手上的ethercat板子供电同时使用我们提供的网线连接ethercat板子以及我们提供的电脑。<br>
 原教程说明，`src/EcatV2_Master/eeproms` 目录中提供可用模块的 EEPROM 文件。烧录前先确定下面三个参数：
 
 | 参数 | 含义 | 原教程示例 |
@@ -181,8 +190,33 @@ chmod +x src/EcatV2_Master/tools/*
 | `<slave id>` | 从站在 EtherCAT 链路中的序号 | `1` |
 | `<eeprom file path>` | 要写入的 EEPROM 文件路径 | `src/EcatV2_Master/eeproms/58100H750_UniversalModule.bin` |
 
-原教程示例假定使用的是 **H750 Universal Module**，并且模块是直接连接主机网卡的**第一个 EtherCAT 从站**。
-
+原教程示例假定使用的是 **H750 Universal Module**，并且模块是直接连接主机网卡的**第一个 EtherCAT 从站**。<br>
+那么如何判断你的网口名称是哪个呢？请在终端输入：
+~~~bash
+ip -br link
+~~~
+大概率会输出：
+~~~
+lo       UNKNOWN    00:00:00:00:00:00
+eno1     UP         12:34:56:78:90:AB
+enp3s0   UP       12:34:56:78:90:CD
+wlp2s0   UP         12:34:56:78:90:EF
+~~~
+诸如此类的内容。
+之后你可以尝试把ethercat的 typeC供电拔下来。（此时板子上所有的灯会熄灭~）
+之后你再运行一遍：
+~~~bash
+ip -br link
+~~~
+你会发现其中一个出现的网口变成了DOWN，类似于：
+~~~bash
+lo       UNKNOWN    00:00:00:00:00:00
+eno1     UP         12:34:56:78:90:AB
+enp3s0   DOWN       12:34:56:78:90:CD
+wlp2s0   UP         12:34:56:78:90:EF
+~~~
+这里的例子给的大家是 enp3s0 从UP变成了DOWN。说明在ethercat连接并使用的网口名称是：enp3s0 <br>
+也就是我们找到了连接电脑和ethercat板子之间的通信门口，我们后续让ethercat和电脑通信都走这个网口，类似于找到了ethercat的家门。如果这一步认错了家门，自然是后面无法正常通讯滴~
 ### 步骤 4：按原教程命令烧录
 
 **原始通用命令格式**：
@@ -197,9 +231,12 @@ src/EcatV2_Master/tools/eepromtool <NIC name> <slave id> -w <eeprom file path>
 src/EcatV2_Master/tools/eepromtool enp3s0 1 -w src/EcatV2_Master/eeproms/58100H750_UniversalModule.bin
 ~~~
 
-`-w` 表示写入 EEPROM。烧录前必须核实模块型号、网卡名、从站序号和文件路径；**不能把示例中的 `enp3s0` 和 `1` 直接视为自己硬件的真实配置**。
+**注意：你的网口名称大概率不是enp3s0，因此请把上面命令中的 `enp3s0` 替换成你自己电脑的 EtherCAT 网口名称。** <br>
+刚才教过大家怎么查自己的网口叫什么。
 
-> **操作安全**：EEPROM 烧录会修改实体模块的配置。原教程指出可以重复执行烧录命令以确保写入成功；但应先检查工具的输出，如果参数或链路有误，不要盲目连续写入。
+> **操作安全**：EEPROM 烧录会修改实体模块的配置。原教程指出可以重复执行烧录命令以确保写入成功。<br>
+这里提醒大家一定要重复烧录3次以上，确保它确实烧录上了。<br>
+>  **Tips:** 按下“向上”的键盘箭头然后再按下Enter按键可以重复运行上一次运行的指令。
 
 ### 步骤 5：检查烧录结果
 
@@ -207,17 +244,23 @@ src/EcatV2_Master/tools/eepromtool enp3s0 1 -w src/EcatV2_Master/eeproms/58100H7
 
 ![flash-done.png：原版教程的 EEPROM 烧录完成示例](../img/flash-done.png)
 
-<sub>原版图片 `docs/img/flash-done.png`；当前教学仓库复用相同文件。</sub>
-
+能看到最后几行：
+~~~bash
+Busy..........
+Total EEPROM write time :3507ms
+End, close socket
+End program
+~~~
+就说明完成了一次烧录
 ### 步骤 6：模块断电并重新上电
 
-原教程强调：**EEPROM 写入完成后，必须关闭 EtherCAT 模块电源，再重新供电，才能使新配置生效。**
-
-这意味着对**实体模块断电和重新上电**，而不只是关闭终端窗口。
+这里强调：**EEPROM 写入完成后，必须拔下 typeC电源，然后冷静10秒再重新供电，才能使新配置生效。**
 
 ---
 
 ## 3. Flash Firmware for MCU（为 MCU 烧录固件）
+### 这一步可以跳过直接进入[→ 第一次运行与测试（First Run Test）](first-run-test.md) <br>
+但是如果你想阅读一下也不是什么坏事。
 
 ### 是否必须进行固件烧录？
 
@@ -225,7 +268,7 @@ src/EcatV2_Master/tools/eepromtool enp3s0 1 -w src/EcatV2_Master/eeproms/58100H7
 
 ### 固件从哪里获取？
 
-原教程给出两种方法：
+教程给出两种方法：
 
 1. 按对应固件仓库的说明自行构建。
 2. 从 GitHub **Actions** 页面下载项目提供的构建产物（Artifacts）。
@@ -250,17 +293,6 @@ src/EcatV2_Master/tools/eepromtool enp3s0 1 -w src/EcatV2_Master/eeproms/58100H7
 ## 4. Done（环境准备完成）
 
 按原版教程，完成上述环境准备后，即可继续学习**运行第一次 SOEM 测试**。
-
-### 第二部分操作检查清单
-
-- [ ] 可以访问原版 EcatV2_Master 仓库。
-- [ ] 已进入工作空间根目录并创建 `src`。
-- [ ] 如原本不是 Git 仓库，已执行 `git init`。
-- [ ] 已通过 `git submodule add` 添加 `src/EcatV2_Master`。
-- [ ] 已执行 `git submodule update --init --recursive`，获取嵌套子模块。
-- [ ] 已找到 `src/EcatV2_Master/tools` 和 `src/EcatV2_Master/eeproms`。
-- [ ] **如需烧录 EEPROM**：已确认型号、网卡、从站编号、文件路径以及烧录结果，并重新为模块上电。
-- [ ] **如需更新 MCU 固件**：已查阅对应固件仓库并确认其 `.elf` 文件和烧录流程。
 
 > **课程实机状态**：以上为依照上游教程整理的教学操作步骤，并不表示已经在课程设备上完成实际烧录。硬件名称、网卡编号、链路顺序与刷写结果须在现场核对。
 
