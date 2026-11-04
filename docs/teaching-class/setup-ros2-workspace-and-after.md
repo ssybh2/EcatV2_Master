@@ -2,16 +2,12 @@
 
 [← 返回 Environment Setup 目录](environment-setup.md) · [返回课程主页](../../readme.md)
 
-> **教学依据**：本部分按照 [AIMEtherCAT 原始 Environment Setup](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/environment-setup.md) **从 Setup ROS2 Workspace 到 Done** 的原有顺序讲解。保留原版仓库地址、关键命令、EEPROM 示例参数及两张配图，并增加面向初学者的中文操作说明。尚未在课程实机验证的路径、网卡与从站序号均为示例。
-
 ## 本部分学习目标
 
 1. **Setup ROS2 Workspace**：创建工作空间，将 EcatV2_Master 添加为 Git 子模块。
 2. **Flash EEPROM For EtherCAT Module**：找到 EEPROM 工具和配置文件，并了解烧录流程。
 3. **Flash Firmware for MCU**：区分 MCU 固件与 EEPROM，了解固件的获取方式。
 4. **Done**：完成检查，进入首次测试教程。
-
-> **开始之前**：先完成[第一部分：基础系统与实时环境准备](environment-before-ros2-workspace.md)。原教程从此处开始介绍**仓库获取与模块部署**，并没有在本节给出 ROS 2 安装或 `colcon build` 指令，因此本页不擅自增加未在原文提供的编译流程。
 
 ---
 
@@ -25,9 +21,7 @@ https://github.com/AIMEtherCAT/EcatV2_Master
 
 这一步的目的是避免后续获取代码时遇到权限或网络问题。
 
-> **注意**：原教程确实提到了 SSH 公钥，但其下方 `git submodule add` 命令实际使用 **HTTPS** 仓库地址。二者是不同的访问方式；不要误以为运行该 HTTPS 命令必须使用 SSH 私钥。
-
-### 步骤 2：进入工作空间，创建 src 文件夹
+### 步骤 2：创建Ethercat工作空间以及src目录
 
 原教程要求进入自己的工作空间目录，然后创建 `src` 文件夹。
 
@@ -37,7 +31,7 @@ https://github.com/AIMEtherCAT/EcatV2_Master
 mkdir -p ~/ethercat_ws/src
 cd ~/ethercat_ws
 ~~~
-
+这两行的意思分别是：先创建一个叫做ethercat_ws的文件夹并且它里面还有一个叫做src的文件夹，之后进入ethercat_ws. "cd"表示进入某个路径。
 此时的目录结构：
 
 ~~~text
@@ -45,21 +39,19 @@ ethercat_ws/
 └── src/
 ~~~
 
-后面的所有 `src/EcatV2_Master/...` 路径都**相对于工作空间根目录**。不要先 `cd src` 再执行原教程的子模块命令，否则路径会发生变化。
-
 ### 步骤 3：初始化 Git 仓库
 
-原教程指出：**如果这里尚未初始化 Git 仓库**，先执行：
+请在ethercat_ws根目录下执行：
 
 ~~~bash
 git init
 ~~~
 
-`git init` 的作用是把当前工作空间设为 Git 仓库，以便下一步添加子模块。如果已经是 Git 仓库，就无需重复初始化。
+`git init` 的作用是把当前工作空间设为 Git 仓库，以便下一步添加子模块。
 
 ### 步骤 4：添加 EcatV2_Master 子模块
 
-在**工作空间根目录**执行原教程的完整命令：
+在**工作空间根目录**也就是ethercat_ws执行原教程的完整命令：
 
 ~~~bash
 git submodule add https://github.com/AIMEtherCAT/EcatV2_Master.git src/EcatV2_Master
@@ -71,13 +63,9 @@ git submodule add https://github.com/AIMEtherCAT/EcatV2_Master.git src/EcatV2_Ma
 - `https://github.com/AIMEtherCAT/EcatV2_Master.git`：原版教程指定的上游项目。
 - `src/EcatV2_Master`：项目被添加到当前工作空间中的位置。
 
-完成后，代码应位于 `src/EcatV2_Master`。父仓库还会记录 `.gitmodules` 等子模块信息。
-
-> **不要重复添加**：如果该路径已经是添加成功的子模块，就不要再次执行这条命令。此处保持原教程的上游仓库地址，不换成其他 fork。
-
 ### 步骤 5：拉取嵌套子模块
 
-原教程接着执行：
+接着执行：
 
 ~~~bash
 git submodule update --init --recursive
@@ -91,7 +79,7 @@ git submodule update --init --recursive
 | `--init` | 初始化尚未初始化的子模块 |
 | `--recursive` | 递归处理子模块内部的嵌套子模块 |
 
-**为什么要执行？** 原教程说明，此步骤会进一步获取项目使用的 `soem` 代码。只添加最外层 `EcatV2_Master`，不代表嵌套依赖都已拉取完成。
+**为什么要执行？** 因为此步骤会进一步获取项目使用的 `soem` 代码。
 
 ### 步骤 6：以后更新 EcatV2_Master
 
@@ -100,8 +88,7 @@ git submodule update --init --recursive
 ~~~bash
 git submodule update --remote src/EcatV2_Master
 ~~~
-
-该命令按子模块配置中的远程跟踪设置更新 `src/EcatV2_Master`。**首次安装使用步骤 4、5；这条 `--remote` 命令用于后续主动更新。** 更新可能改变子模块所指向的提交，执行前应确认确实需要升级。
+但是这次不用运行这个指令。
 
 ### 完成此节后，目录应该是什么样？
 
@@ -124,7 +111,33 @@ ethercat_ws/
 
 ## 2. Flash EEPROM For EtherCAT Module（烧录 EtherCAT 模块 EEPROM）
 
-### 步骤 1：找到 tools 和 eeproms
+### 步骤 1： Linux指令tips教学
+这是一些简单的快捷终端指令能够帮助你快速上手linux，并且接下来会频繁用到。
+假设你现在在路径ethercat_ws里面。由于你之前在ethercat_ws里面创建过一个叫做src的文件夹，你想在终端里面查看他到底有没有被真的创建以及src文件夹里面有什么内容。可以尝试以下指令：
+~~~bash
+cd src
+~~~
+这表示你进入了ethercat_ws里面的src文件夹。之后运行：
+~~~bash
+ls
+~~~
+这会展示src文件夹里面的东西。
+如果你后续想要从src回到上一级目录，请运行：
+~~~bash
+cd ..
+~~~
+注意cd后面有一个空格，然后是两个英文句号。这表示回退到上一级目录。  
+同样如果你想回退好几个目录，可以参考以下指令，不过不用运行：
+~~~bash
+cd ../..
+~~~
+这表示回退了2级。同理回退三级就是：
+~~~bash
+cd ../../..
+~~~
+相当于按下了3次返回按键。
+之后我们回到正题。
+### 步骤 2：找到 tools 和 eeproms
 
 原教程要求返回**工作空间根目录**，确认可以访问两个路径：
 
@@ -137,7 +150,7 @@ ethercat_ws/
 
 <sub>原版图片 `docs/img/tools-tree.png`；当前教学仓库复用相同文件。</sub>
 
-### 步骤 2：切换 root 并赋予执行权限
+### 步骤 3：切换 root 并赋予执行权限
 
 原教程首先执行：
 
