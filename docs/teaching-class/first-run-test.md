@@ -101,15 +101,23 @@ touch config.yaml
 ~~~yaml
 slaves:
   - sn2228293:
-      sdo_len: !uint16_t 2
+      sdo_len: !uint16_t 15
       task_count: !uint8_t 1
-      latency_pub_topic: !std::string '/latency'
+      latency_pub_topic: !std::string '/ecat/sn2228293/latency'
 
       tasks:
         - app_1:
             sdowrite_task_type: !uint8_t 3
-            pub_topic: !std::string '/imu'
+            conf_connection_lost_read_action: !uint8_t 0x01
+            pub_topic: !std::string '/ecat/sn2228293/app1/read'
             pdoread_offset: !uint16_t 0
+            sdowrite_can_inst: !uint8_t 1
+            sdowrite_packet1_id: !uint32_t 0x01
+            sdowrite_packet2_id: !uint32_t 0x02
+            sdowrite_packet3_id: !uint32_t 0x03
+            conf_frame_name: !std::string 'imu_link'
+
+
 ~~~
 然后按下 Ctrl+S 保存。现在你还不需要理解这个是什么意思。一会儿讲解~ <br>
 你只需要记住我们在这里起了一个假的从站（ethercat）名字，也就是sn2228293 <br>
