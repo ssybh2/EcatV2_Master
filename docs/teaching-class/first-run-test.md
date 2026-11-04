@@ -4,9 +4,14 @@
 
 ## 1. Create Bringup Package（创建 ROS 2 启动包）
 
-### 步骤 1：进入 src 目录
+### 步骤 1：退出root权限并进入 src 目录
 
 打开终端，输入：
+~~~bash
+exit
+~~~
+你会发现原本灰白色的终端又变成了蓝色绿色，拥有了色彩。这说明你退出了root权限，回到了普通用户权限。<br>
+之后运行
 
 ~~~bash
 cd ~/ethercat_ws/src
@@ -37,9 +42,11 @@ mkdir -p config launch
 
 ### 步骤 4：修改 CMakeLists.txt
 
-点开屏幕最左边靠上位置的files文件夹
-
-按原教程加入以下内容：
+点开屏幕最左边靠上位置的files文件夹，如图所示：
+/图片/待插入
+这个类似于windows的文件管理器，很好理解。<br>
+然后点开你之前创建的ethercat_ws文件夹，再点开里面的src，再点开里面的soem_bringup文件夹，再点开里面的CMakeLists.txt
+找到第13行并插入以下内容：
 
 ~~~cmake
 install(DIRECTORY
@@ -48,12 +55,10 @@ install(DIRECTORY
         DESTINATION share/${PROJECT_NAME}/
 )
 ~~~
-
+之后按Ctrl+S进行保存。
 **应放在 `ament_package()` 前面。** 原版教程提到第 13 行，但不同版本生成的文件行数可能不一样，位置以 `ament_package()` 为准。
 
 作用：编译安装时，把 `launch` 与 `config` 目录复制到 ROS 2 包的共享目录，否则运行 `ros2 launch` 时可能无法找到启动文件，或者程序找不到配置文件。
-
-在 nano 编辑器里，按 `Ctrl + O` → `Enter` 保存，按 `Ctrl + X` 退出。
 
 ### 步骤 5：确认目录结构
 
@@ -84,10 +89,14 @@ ethercat_ws/
 
 ~~~bash
 cd ~/ethercat_ws/src/soem_bringup/config
-nano config.yaml
 ~~~
+之后输入：
+~~~bash
+touch config.yaml
+~~~
+之后去files文件管理器里面找到对应路径下的文件：ethercat_ws/src/soem_bringup/config/config.yaml <br>
 
-将**原教程的示例 YAML 原样粘贴**到文件里：
+然后将**原教程的示例 YAML 原样粘贴**到文件里：
 
 ~~~yaml
 slaves:
@@ -102,40 +111,32 @@ slaves:
             pub_topic: !std::string '/imu'
             pdoread_offset: !uint16_t 0
 ~~~
-
-保存后退出：`Ctrl + O` → `Enter` → `Ctrl + X`。
-
-**特别注意：** YAML 依靠空格缩进表示层级关系；不要随便调整空格、删去 `!uint16_t` / `!uint8_t` / `!std::string` 这样的类型标签，或将它们写成中文标点。
-
-### 步骤 2：理解各字段
-
-| 配置 | 作用 | 示例值 |
-| --- | --- | --- |
-| `slaves` | EtherCAT 从站配置列表 | — |
-| `sn2228293` | 从站 SN（序列号）对应的配置键，格式为 `sn` + 序列号 | `2228293` |
-| `sdo_len` | 本示例的 SDO 数据长度 | `2` |
-| `task_count` | 本示例的任务数量 | `1` |
-| `latency_pub_topic` | 发布通信延迟的 ROS 2 话题名 | `/latency` |
-| `app_1` | 第 1 个应用任务 | — |
-| `sdowrite_task_type` | 此示例所使用的任务类型编号 | `3` |
-| `pub_topic` | 示例应用的话题名 | `/imu` |
-| `pdoread_offset` | PDO 读取偏移 | `0` |
-
-**重点：** `sn2228293` 只是原作者的设备编号，**不是你的设备一定拥有的 SN**。这一章会先执行一次 Launch 来读取真实 SN，再修改这个字段。
-
-如果后面连接多块 EtherCAT 从站，每块板的 SN 都需要单独确认并配置。
+然后按下 Ctrl+S 保存。现在你还不需要理解这个是什么意思。一会儿讲解~ <br>
+你只需要记住我们在这里起了一个假的从站（ethercat）名字，也就是sn2228293 <br>
 
 ---
 
 ## 3. Launch File（创建 bringup.launch.py）
 
-### 步骤 1：打开 launch 文件
-
+### 步骤 1：创建并打开 launch 文件
+你先在大概率在这个目录下面：
 ~~~bash
-cd ~/ethercat_ws/src/soem_bringup/launch
-nano bringup.launch.py
+cd ~/ethercat_ws/src/soem_bringup/config
 ~~~
-
+请你运行
+~~~bash
+cd ..
+~~~
+回到
+~~~bash
+ethercat_ws/src/soem_bringup
+~~~
+然后运行：
+~~~bash
+cd launch
+touch bringup.launch.py
+~~~
+之后在files文件管理器里面找到这个文件，位置在（ethercat_ws/src/soem_bringup/launch/bringup.launch.py) <br>
 按原教程粘贴下列 Python 代码，保存并退出：
 
 ~~~python
@@ -157,7 +158,7 @@ def generate_launch_description():
             executable='soem_backend',
             name='soem_backend',
             parameters=[{
-                'interface': "enp2s0",
+                'interface': "enp3s0",
                 'rt_cpu': 0,
                 'non_rt_cpus': "1,2,3,4,5,6",
                 'config_file': config_file
@@ -173,31 +174,9 @@ def generate_launch_description():
 
 | 参数 | 原教程示例 | 你应该填写什么 |
 | --- | --- | --- |
-| `interface` | `enp2s0` | **连接 EtherCAT 从站 IN 口**的真实 Linux 有线网卡名 |
+| `interface` | `enp3s0` | **连接 EtherCAT 从站的网口**的真实的有线网卡名，也就是我们在上一课通过终端指令ip -br link找的网口名称 |
 | `rt_cpu` | `0` | 实际隔离的 CPU 逻辑编号（对应第一部分的 X） |
 | `non_rt_cpus` | `1,2,3,4,5,6` | 实际未隔离的其余逻辑 CPU 编号列表（对应第一部分的 Y） |
-
-#### 如何确定 EtherCAT 的网卡名？
-
-打开终端：
-
-~~~bash
-ip -br link
-~~~
-
-可能会看到 `eno1`、`enp2s0`、`enp3s0` 或 `enx...`。可以进一步检查（网口名请按实际替换）：
-
-~~~bash
-sudo ethtool enp2s0
-~~~
-
-如果显示 `Link detected: yes`，说明物理链路已建立，但**不能仅凭此项确定另一端一定是 EtherCAT 从站**。可通过确认连接位置，以及拔插 EtherCAT 网线后查看网口变化来识别。
-
-例如实际连接的网卡叫 `eno1`，就把 Launch 文件中这一行改成：
-
-~~~python
-'interface': "eno1",
-~~~
 
 #### 如何确定 CPU 参数？
 
@@ -210,10 +189,6 @@ cat /proc/cmdline
 
 **不要照抄原版 CPU0 和 1～6 的数字。** 不同 CPU 的逻辑编号和超线程拓扑不相同；`rt_cpu` 和 `non_rt_cpus` 应与你实际生效的隔离配置一致。
 
-#### config_file 要修改吗？
-
-一般不必。原教程使用 `get_package_share_directory('soem_bringup')` 自动定位已安装的 `config/config.yaml`，所以前面必须修改 CMakeLists.txt 并重新编译。
-
 ---
 
 ## 4. Do First-run Test（第一次编译和启动）
@@ -224,47 +199,43 @@ cat /proc/cmdline
 
 ~~~bash
 cd ~/ethercat_ws
-pwd
 ~~~
 
 确保当前在 `ethercat_ws` 根目录，而非 `src`、`config` 或 `launch`。
 
 ### 步骤 2：执行 colcon build
 
-原教程要求：
+一定要在ethercat_ws根目录执行：
 
 ~~~bash
 colcon build
 ~~~
+这里一般会编译5分钟左右，请耐心等待~
 
-请使用**普通用户**编译，不要用 root。编译成功后，工作空间根目录通常会生成 `build`、`install` 和 `log`。
+### 步骤 3：等编译好了之后另开一个 root 终端
 
-如果看到 `colcon: command not found`，需要先检查 ROS 2 构建工具是否已经安装；不能直接跳过这一步。
-
-### 步骤 3：另开一个 root 终端
-
-原版教程说明，此项目启动时需要 root 权限，但建议普通用户构建。推荐分工：
+此项目启动时需要 root 权限（也就是纯灰白色的字母终端），但建议使用普通用户(也就是蓝绿色字母的终端）。推荐分工：
 
 | 终端 | 权限 | 操作 |
 | --- | --- | --- |
 | A | 普通用户 | 修改文件、`colcon build` |
 | B | root | 加载工作空间、运行 `soem_backend` |
 
-在**终端 B** 执行原版命令：
+按下Ctrl + Alt + t开启一个新的终端。 
+
+在**新终端** 执行命令：
 
 ~~~bash
-sudo su root
+sudo su
 ~~~
 
-输入密码后切换至 root。**不要忽略工作目录：** root 用户的 `~` 代表 `/root`，不再代表你的普通用户 Home。
+输入密码 1 后切换至 root
 
 假如你普通用户名叫 `hby`，且工作空间建在该用户的 Home：
 
 ~~~bash
 cd /home/hby/ethercat_ws
 ~~~
-
-这里 `hby` 只是**举例**，请换成真实用户名。可以运行 `pwd` 核对当前目录。
 
 ### 步骤 4：加载已编译的工作空间
 
@@ -278,17 +249,15 @@ source install/setup.bash
 
 ### 步骤 5：启动 SOEM
 
+确保你的ethercat板子现在有typeC供电，也就是上面的灯亮着。同时网线连接着电脑以及ethercat板子。
+
 再执行原版教程的标准命令：
 
 ~~~bash
 ros2 launch soem_bringup bringup.launch.py
 ~~~
 
-**提示：** 原版教程展示的旧日志里有一行 `ros2 launch stewart_bringup bringup.launch.py`，那是作者当时的包名，与本节创建的 `soem_bringup` 不同。**你应该使用上面这一条命令，不要复制旧日志里的 stewart_bringup。**
-
 ### 步骤 6：第一次运行可能出现 key not found
-
-如果网线、网卡和从站供电正确，主站可能先发现硬件，但因为 `config.yaml` 内使用的还是原作者的 SN，报错后退出。
 
 **原版日志关键片段（已省略时间戳与其他调试信息）：**
 
@@ -305,13 +274,9 @@ what():  get Key not found: sn2228293_sdo_len
 
 - `ec_init ... succeeded`：网卡上的 EtherCAT 初始化成功进入这一步。
 - `1 slaves found`：发现了 **1 个从站**。
-- `Found slave id=1, sn=2228293`：最关键，说明日志读出了从站的 **真实 SN**。
-- `Key not found`：通常需要检查配置项是否按实际 SN 建立，以及 YAML 是否正确加载。
-
-**重要：** 原版示例日志里的 SN/配置键还存在不完全一致的片段；上面的错误是说明要**根据实际日志检查配置**，不是说所有硬件都一定会报这条错误。
-
-如果启动失败发生在 `ec_init` 或显示 `0 slaves found`，应该先排查网卡名、供电、EtherCAT IN 接线和物理链路，而不是贸然修改 SN。
-
+- `Found slave id=1, sn=1234567`：最关键，说明日志读出了从站的 **真实 SN**。
+- `Key not found`：sn2228293_sdo_len
+这说明我们之前在config.yaml里面填写的sn2228293是一个假的名字，真实的名字是sn1234567（这个sn1234567 只是一个例子，具体看你终端显示什么数字）<br>
 ---
 
 ## 5. 找到自己的 SN，修改配置并重新运行
@@ -321,21 +286,21 @@ what():  get Key not found: sn2228293_sdo_len
 寻找类似这一行：
 
 ~~~text
-[EthercatNode_CFG]: Found slave id=1, sn=2228293, eepid=3, type=H750UniversalModule
+[EthercatNode_CFG]: Found slave id=1, sn=1234567, eepid=3, type=H750UniversalModule
 ~~~
 
 - `slave id=1`：主站链路中的第 1 个从站；
-- `sn=2228293`：此板的 SN（序列号）；
+- `sn=1234567`：此板的 SN（序列号）；
 - `eepid=3` 和 `type=H750UniversalModule`：模块类型相关信息。
 
 **slave id 是从站顺序编号，SN 是设备序列号，绝对不要混为一谈。**
 
 ### 步骤 2：修改 config.yaml 中的 SN
 
-回到**普通用户终端 A**：
+通过文件管理器找到这个config.yaml文件,位置在：
 
 ~~~bash
-nano ~/ethercat_ws/src/soem_bringup/config/config.yaml
+ethercat_ws/src/soem_bringup/config/config.yaml
 ~~~
 
 将原版配置里的：
@@ -352,7 +317,7 @@ nano ~/ethercat_ws/src/soem_bringup/config/config.yaml
   - sn12345678:
 ~~~
 
-保留前缀 `sn`。这里的 12345678 是虚构的格式例子，不是你的板子的 SN。其余字段先继续保持原教程示例。
+保留前缀 `sn`。然后按下Ctrl+S进行保存。
 
 **原版配图：按日志中的 SN 修改配置**
 
@@ -362,18 +327,17 @@ nano ~/ethercat_ws/src/soem_bringup/config/config.yaml
 
 ### 步骤 3：重新编译，使修改后的配置安装生效
 
-原教程要求**修改 YAML 后再次执行 `colcon build`**：
+**修改 YAML 后再次执行 `colcon build`**<br>
+请你打开那个有蓝绿色的普通用户终端。并在里面执行：
 
 ~~~bash
 cd ~/ethercat_ws
 colcon build
 ~~~
-
-这是因为 `CMakeLists.txt` 中的 `install(DIRECTORY ...)` 会将源代码目录内的 `config` 安装到 `install` 中。如果只编辑源文件不重新编译，主站可能仍读取旧配置。
+这是为了彻底保存之前我们针对于config.yaml的修改。
 
 ### 步骤 4：再启动一次
-
-如果主站进程仍运行，先在其终端按 `Ctrl + C` 停止。然后回到 **root 终端 B** 的实际工作空间根目录，重新执行：
+然后回到 **root 终端 B** （也就是有灰白色字母）的实际工作空间根目录，重新执行：
 
 ~~~bash
 source install/setup.bash
