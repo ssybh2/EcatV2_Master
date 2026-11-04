@@ -31,7 +31,8 @@ https://github.com/AIMEtherCAT/EcatV2_Master
 mkdir -p ~/ethercat_ws/src
 cd ~/ethercat_ws
 ~~~
-这两行的意思分别是：先创建一个叫做ethercat_ws的文件夹并且它里面还有一个叫做src的文件夹，之后进入ethercat_ws. "cd"表示进入某个路径。
+这两行的意思分别是：先创建一个叫做ethercat_ws的文件夹并且它里面还有一个叫做src的文件夹，之后进入ethercat_ws <br>
+"cd"表示进入某个路径。
 此时的目录结构：
 
 ~~~text
@@ -117,25 +118,27 @@ ethercat_ws/
 ~~~bash
 cd src
 ~~~
-这表示你进入了ethercat_ws里面的src文件夹。之后运行：
+这表示你进入了ethercat_ws里面的src文件夹。<br>
+之后运行：
 ~~~bash
 ls
 ~~~
-这会展示src文件夹里面的东西。
+这会展示src文件夹里面的东西。<br>
 如果你后续想要从src回到上一级目录，请运行：
 ~~~bash
 cd ..
 ~~~
-注意cd后面有一个空格，然后是两个英文句号。这表示回退到上一级目录。  
+注意cd后面有一个空格，然后是两个英文句号。这表示回退到上一级目录。<br> 
 同样如果你想回退好几个目录，可以参考以下指令，不过不用运行：
 ~~~bash
 cd ../..
 ~~~
-这表示回退了2级。同理回退三级就是：
+这表示回退了2级。<br>
+同理回退三级就是：
 ~~~bash
 cd ../../..
 ~~~
-相当于按下了3次返回按键。
+相当于按下了3次返回按键。<br>
 之后我们回到正题。
 ### 步骤 2：找到 tools 和 eeproms
 
