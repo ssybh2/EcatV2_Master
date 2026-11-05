@@ -1,5 +1,6 @@
 # 第三部分｜First Run Test：第一次运行 EtherCAT（SOEM）测试
 
+**语言 / Language：** [简体中文（当前）](first-run-test.md) | [English](first-run-test-en.md)
 [← 上一篇：Setup ROS2 Workspace 与后续部署](setup-ros2-workspace-and-after.md) · [返回课程主页](../../readme.md)
 
 ## 1. Create Bringup Package（创建 ROS 2 启动包）
