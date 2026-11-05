@@ -400,24 +400,6 @@ ros2 topic echo /latency
 
 **注意：** 1.0 ms 是原作者给出的经验参考，不是所有场景绝对适用的判定标准；实际实时控制还要关注通信周期、抖动等。
 
----
-
-## 7. 常见问题：出现这些提示怎么处理？
-
-| 现象 | 首先检查 |
-| --- | --- |
-| `ros2: command not found` | ROS 2 是否正确安装，当前终端是否加载了环境 |
-| `colcon: command not found` | 是否安装 `colcon` 构建工具 |
-| `package 'soem_bringup' not found` | 是否 `colcon build` 成功、是否执行 `source install/setup.bash` |
-| `bringup.launch.py` 找不到 | `launch` 文件夹是否存在，`CMakeLists.txt` 是否包含安装命令，是否重新编译 |
-| `config.yaml` 找不到 | `config` 文件路径、`CMakeLists.txt` 的安装规则、编译后的安装文件 |
-| `Device does not exist` / `ec_init` 失败 | `interface` 是否真实存在，网口名是否正确，`ip -br link` 和 `ethtool` 输出 |
-| `0 slaves found` | 从站是否供电，EtherCAT IN 是否接好，是否连接到正确网卡 |
-| `get Key not found: sn...` | 实际从站 SN 与 `config.yaml` 的配置键是否一致，是否重新编译 |
-| `rt_cpu` 配置或绑核失败 | CPU 编号与隔离参数是否对应，是否为正确的原生 Linux 实时环境 |
-| 没有 `/latency` | 主站是否运行、是否初始化成功、YAML 是否设置该话题 |
-
-> **硬件安全**：本节先验证 SOEM 与从站通信。如板上连接电机等执行器，请确认不会意外运动。原版的 `/imu` 示例只对应其示例应用配置，不代表任何实际模块都可不加修改地使用。
 
 ---
 
