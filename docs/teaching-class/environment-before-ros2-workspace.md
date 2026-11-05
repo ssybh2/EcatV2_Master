@@ -1,5 +1,6 @@
 # 第一部分｜基础系统与实时环境准备
 
+**语言 / Language：** [简体中文（当前）](environment-before-ros2-workspace.md) | [English](environment-before-ros2-workspace-en.md)
 [← 返回 Environment Setup 目录](environment-setup.md) · [返回课程主页](../../readme.md)
 
 > **教学草稿（中文版）**：本文整理自 [AIMEtherCAT 原始 Environment Setup](https://github.com/AIMEtherCAT/EcatV2_Master/blob/main/docs/environment-setup.md) 中 **Setup ROS2 Workspace 之前**的内容。由于课程用笔记本尚未到手，BIOS 菜单、CPU 编号、网卡型号等都需要后续实机确认。请不要将本文示例参数直接作为最终硬件配置。
