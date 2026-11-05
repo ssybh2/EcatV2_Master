@@ -406,6 +406,11 @@ ros2 topic echo /ecat/sn12345678/latency
 
 ## 下一步
 
+### **[→ 第四部分：Customize Configuration（自定义 EtherCAT 配置）](customize-configuration.md)**
+
+完成第一次 SOEM 运行测试后，下一课将使用 AIMEtherCAT 在线 TaskEditor，为自己的 EtherCAT 模块添加任务，生成并部署新的 `config.yaml`。
+
+
 
 [← 上一篇：Setup ROS2 Workspace 与后续部署](setup-ros2-workspace-and-after.md) · [返回课程主页](../../readme.md)
 
