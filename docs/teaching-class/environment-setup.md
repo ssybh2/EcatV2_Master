@@ -1,8 +1,9 @@
+**语言 / Language：** [简体中文（当前）](environment-setup.md) | [English](environment-setup-en.md)
+
 <div align="center">
 
 # Environment Setup
 
-**语言 / Language：** [简体中文（当前）](environment-setup.md) | [English](environment-setup-en.md)
 
 ### EtherCAT 环境搭建 · 教学目录
 
