@@ -2,20 +2,13 @@
 
 [← 返回 Environment Setup 目录](environment-setup.md) · [返回课程主页](../../readme.md)
 
-## 本部分学习目标
-
-1. **Setup ROS2 Workspace**：创建工作空间，将 EcatV2_Master 添加为 Git 子模块。
-2. **Flash EEPROM For EtherCAT Module**：找到 EEPROM 工具和配置文件，并了解烧录流程。
-3. **Flash Firmware for MCU**：区分 MCU 固件与 EEPROM，了解固件的获取方式。
-4. **Done**：完成检查，进入首次测试教程。
-
 ---
 
 ## 1. Setup ROS2 Workspace（设置 ROS 2 工作空间）
 
 ### 步骤 1：确认能够访问 GitHub 仓库
 
-原教程首先要求确认：**本机 SSH 公钥已添加到 GitHub 账号**，并且电脑可以访问：
+原教程首先要求电脑可以访问：
 
 https://github.com/AIMEtherCAT/EcatV2_Master
 
