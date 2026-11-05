@@ -382,10 +382,14 @@ slave id 1 confirmed ready
 
 ### 步骤 2：查看 /latency 话题
 
-保持主站启动的 root 终端运行，**再开一个普通终端**：
+保持主站启动的 root 终端运行，**通过按下键盘Ctrl+Alt+t再开一个普通终端**然后运行：
 
 ~~~bash
 cd ~/ethercat_ws
+sudo su
+~~~
+然后输入阿拉伯数字 1 这是密码。然后运行：
+~~~bash
 source install/setup.bash
 ros2 topic list
 ~~~
@@ -393,21 +397,15 @@ ros2 topic list
 如果能看到 `/latency`，就可以订阅查看：
 
 ~~~bash
-ros2 topic echo /latency
+ros2 topic echo /ecat/sn12345678/latency
 ~~~
-
-原版教程说明：`/latency` 用于观察电脑到 EtherCAT 模块之间的通信延迟，单位是 **毫秒（ms）**。原教程指出大部分情况下延迟应 **小于 1.0 ms**；明显大于 1.0 ms 时，首先检查 CPU 隔离配置，并结合实时内核、网卡和链路状态排查。
-
-**注意：** 1.0 ms 是原作者给出的经验参考，不是所有场景绝对适用的判定标准；实际实时控制还要关注通信周期、抖动等。
-
+类似于这种话题，sn后面的数字改成你自己的。如果能够echo出来实时变化的数字说明操作正确。
 
 ---
 
-> **课程状态说明**：本文根据原版教程编写，不表示已在课程实际电脑及 EtherCAT 板上执行成功；网卡、CPU、SN 和日志均须在实机上核对。
 
 ## 下一步
 
-完成此步骤后，继续参考 [AIMEtherCAT 官方文档目录](https://github.com/AIMEtherCAT/EcatV2_Master/tree/main/docs)，学习 `soem_wrapper` 的其他应用。
 
 [← 上一篇：Setup ROS2 Workspace 与后续部署](setup-ros2-workspace-and-after.md) · [返回课程主页](../../readme.md)
 
