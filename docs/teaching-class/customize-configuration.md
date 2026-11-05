@@ -1,5 +1,6 @@
 # 第四部分｜Customize Configuration（自定义 EtherCAT 配置）
 
+**语言 / Language：** [简体中文（当前）](customize-configuration.md) | [English](customize-configuration-en.md)
 [← 上一节：First Run Test](first-run-test.md) · [返回课程主页](../../readme.md)
 
 ## 我们这节课要做什么？
