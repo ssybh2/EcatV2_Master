@@ -1,5 +1,6 @@
 # 第二部分｜Setup ROS2 Workspace 与后续部署
 
+**语言 / Language：** [简体中文（当前）](setup-ros2-workspace-and-after.md) | [English](setup-ros2-workspace-and-after-en.md)
 [← 返回 Environment Setup 目录](environment-setup.md) · [返回课程主页](../../readme.md)
 
 ---
