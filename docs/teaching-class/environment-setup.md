@@ -2,6 +2,8 @@
 
 # Environment Setup
 
+**语言 / Language：** [简体中文（当前）](environment-setup.md) | [English](environment-setup-en.md)
+
 ### EtherCAT 环境搭建 · 教学目录
 
 **Salman 控制课程 | 408 Control System Lab**
