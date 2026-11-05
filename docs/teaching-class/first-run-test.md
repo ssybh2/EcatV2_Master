@@ -421,18 +421,6 @@ ros2 topic echo /latency
 
 ---
 
-## 本节完成检查清单
-
-- [ ] 已在 `src` 创建 `soem_bringup`。
-- [ ] 已创建 `config`、`launch`，并修改 `CMakeLists.txt`。
-- [ ] 已创建 `config.yaml` 与 `bringup.launch.py`。
-- [ ] 已核对实际 `interface`、`rt_cpu` 和 `non_rt_cpus`。
-- [ ] 已用**普通用户**执行 `colcon build`。
-- [ ] 已在 **root** 终端加载 `install/setup.bash` 并启动主站。
-- [ ] 已从日志识别真实 SN，修改 `config.yaml` 并重新编译。
-- [ ] 日志显示对应从站 `confirmed ready`。
-- [ ] 可以查看 `/latency` 话题，理解延迟单位与意义。
-
 > **课程状态说明**：本文根据原版教程编写，不表示已在课程实际电脑及 EtherCAT 板上执行成功；网卡、CPU、SN 和日志均须在实机上核对。
 
 ## 下一步
